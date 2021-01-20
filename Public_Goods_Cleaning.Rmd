@@ -1,0 +1,131 @@
+---
+title: "Public_Goods_Cleaning"
+author: "Simon van Baal"
+date: "19/11/2020"
+output: html_document
+---
+
+```{r libraries}
+library(tidyverse)
+
+
+
+```
+
+```{r loading data files}
+rawPublicGoods <- read_csv('Public_Goods_Raw.csv')
+rawSurvey <- read_csv('Survey_Raw.csv')
+
+
+```
+
+```{r Data Cleaning}
+
+rawSurvey <- 
+  rawSurvey %>%
+  select(participant.code,
+         participant.time_started,
+         player.age,
+         player.gender,
+         player.covid_positive,
+         player.location,
+         player.state,
+         player.crt_widget,
+         player.crt_lake)
+
+rawPublicGoods <- 
+  rawPublicGoods %>%
+  filter(session.is_demo == 0) %>%
+  select(session.code,
+         participant.code,
+         participant.payoff,
+         subsession.round_number,
+         player.id_in_group,
+         player.infected,
+         player.cumulative_earnings,
+         player.my_endowment,
+         player.contribution,
+         player.actual_payment,
+         player.payoff,
+         player.transmission_chance,
+         player.second_player_contribution_0,
+         player.second_player_contribution_1,
+         player.second_player_contribution_2,
+         player.second_player_contribution_3,
+         player.second_player_contribution_4,
+         group.total_contribution,
+         group.total_infections,
+         group.end_total_infections,
+         group.total_earnings,
+         group.lockdown,
+         group.lockdown_number,
+         group.number_of_players)
+
+# Excluding participants who did not finish the experiment.
+DNF <- 
+  rawPublicGoods %>%
+  group_by(session.code, participant.code) %>%
+  summarise(cumulativeEarnings = max(player.cumulative_earnings)) %>%
+  filter(cumulativeEarnings > 500, session.code != 'q1uimr6i')
+
+rawPublicGoods <- 
+  rawPublicGoods %>% 
+  right_join(DNF, by = c("participant.code", "session.code"))
+
+# Check number of participants per group
+#DNF %>% group_by(session.code) %>% summarise(n = n())
+# 064qyher has 8, the rest has 9 participants.
+
+rawPublicGoods <- 
+  rawPublicGoods %>%
+  mutate(group.number_of_players = ifelse(session.code == '064qyher', 8, 9),
+         player.second_player_contribution_0 = ifelse(player.second_player_contribution_0 == 5, 
+                                                      NA,
+                                                      player.second_player_contribution_0),
+         player.second_player_contribution_1 = ifelse(player.second_player_contribution_1 == 5, 
+                                                      NA,
+                                                      player.second_player_contribution_1),
+         player.second_player_contribution_2 = ifelse(player.second_player_contribution_2 == 5, 
+                                                      NA,
+                                                      player.second_player_contribution_2),
+         player.second_player_contribution_3 = ifelse(player.second_player_contribution_3 == 5, 
+                                                      NA,
+                                                      player.second_player_contribution_3),
+         player.second_player_contribution_4 = ifelse(player.second_player_contribution_4 == 5, 
+                                                      NA,
+                                                      player.second_player_contribution_4),
+         player.contribution = ifelse(is.na(player.second_player_contribution_0) &
+                                        is.na(player.second_player_contribution_1) &
+                                        is.na(player.second_player_contribution_2) &
+                                        is.na(player.second_player_contribution_3) &
+                                        is.na(player.second_player_contribution_4), 
+                                      NA,
+                                      player.contribution),
+         group.condition = ifelse(player.my_endowment == 40 |
+                                    player.my_endowment == 240, 
+                                  'High Gini',
+                                  ifelse(player.my_endowment == 60 |
+                                           player.my_endowment == 160,
+                                         'Low Gini',
+                                         ifelse(player.my_endowment == 50, 
+                                                'Poverty',
+                                                ifelse(player.my_endowment == 100, 
+                                                       'Equality', NA)))))
+
+publicGoodsData <-
+  rawPublicGoods %>%
+  left_join(rawSurvey, by = c('participant.code'))
+
+rm(rawPublicGoods, rawSurvey)
+
+```
+
+
+```{r write csv}
+
+write.csv(publicGoodsData, 'CleanedPublicGoods.csv')
+
+
+
+
+```
