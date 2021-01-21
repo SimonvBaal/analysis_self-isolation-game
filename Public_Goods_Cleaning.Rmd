@@ -8,18 +8,19 @@ output: html_document
 ```{r libraries}
 library(tidyverse)
 
-
-
 ```
 
 ```{r loading data files}
 rawPublicGoods <- read_csv('Public_Goods_Raw.csv')
 rawSurvey <- read_csv('Survey_Raw.csv')
 
+exp1RawSurvey <- read_csv('SurveysExperiment1.csv')
+exp1RawGame <- read_csv("gameData1.csv")
+
 
 ```
 
-```{r Data Cleaning}
+```{r Data Cleaning Pilot}
 
 rawSurvey <- 
   rawSurvey %>%
@@ -120,12 +121,70 @@ rm(rawPublicGoods, rawSurvey)
 
 ```
 
+```{r Data Cleaning Experiment 1}
+exp1RawSurvey <- 
+  exp1RawSurvey %>%
+  select(session.code,
+         participant.code,
+         age,
+         gender,
+         covid_positive,
+         location,
+         attention_check)
+
+exp1RawGame <- 
+  exp1RawGame %>%
+  filter(session.is_demo == 0) %>%
+  select(session.code,
+         participant.code,
+         participant.payoff,
+         subsession.round_number,
+         player.id_in_group,
+         player.infected,
+         player.cumulative_earnings,
+         player.others_prediction,
+         player.contribution,
+         player.others_contribution_percentage,
+         player.actual_payment,
+         player.payoff,
+         player.transmission_chance,
+         player.second_player_contribution_0,
+         player.second_player_contribution_1,
+         player.second_player_contribution_2,
+         player.second_player_contribution_3,
+         player.second_player_contribution_4,
+         group.total_contribution,
+         group.total_infections,
+         group.end_total_infections,
+         group.total_earnings,
+         group.lockdown,
+         group.lockdown_number,
+         group.lockdown_cost)
+
+# Excluding participants who did not finish the experiment.
+DNFexp1 <- 
+  exp1RawGame %>%
+  group_by(session.code, participant.code) %>%
+  summarise(cumulativeEarnings = max(player.cumulative_earnings)) %>%
+  filter(cumulativeEarnings > 1000, session.code != 'q1uimr6i')
+
+exp1GameData <- 
+  exp1RawGame %>% 
+  right_join(DNFexp1, 
+             by = c("participant.code", 
+                             "session.code")) %>%
+  arrange(participant.code, subsession.round_number) %>%
+  mutate(lastRoundOthers = lag(player.others_contribution_percentage))
+
+exp1GameData <- 
+  left_join(exp1GameData, exp1RawSurvey, by = c("session.code", "participant.code"))
+
+```
 
 ```{r write csv}
 
-write.csv(publicGoodsData, 'CleanedPublicGoods.csv')
-
-
+write_csv(publicGoodsData, 'CleanedPublicGoods.csv')
+write_csv(exp1GameData, 'Exp1PublicGoodsCleaned.csv')
 
 
 ```

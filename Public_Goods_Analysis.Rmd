@@ -1,10 +1,12 @@
 ---
-title: "Public_Goods_Analysis"
+title: "Public_Goods_Analysis_Pilot"
 author: "Simon van Baal"
 date: "19/11/2020"
 output: html_document
 ---
 
+
+This Rmd file contains the analysis of the pilot experiment.
 ```{r libraries, warning=F}
 library(tidyverse)
 library(afex)
@@ -19,8 +21,251 @@ library(broom)
 ```{r load data, warning=F}
 publicGoodsData <- read_csv('CleanedPublicGoods.csv') %>%
   filter(subsession.round_number <= 20)
+exp1GameData <- read_csv("Exp1PublicGoodsCleaned.csv")
 
 ```
+
+
+
+
+
+```{r Exclusions}
+# Identify participants with low effort responses.
+
+#If participants give the same answers for the hypothetical decisions at least 95% of the time, 
+#their hypothetical decisions will be discarded, but the other DVs will be retained. 
+#The same applies for the other DVs, where we will remove low-effort responses identified in this way.
+
+# For incentivised self-isolation:
+perResponse <-
+  exp1GameData %>%
+  filter(group.lockdown == 0) %>%
+  group_by(participant.code, player.contribution) %>%
+  summarise(n = n()) %>%
+  filter(!is.na(player.contribution))
+
+nTrials <- 
+  perResponse %>%
+  group_by(participant.code) %>%
+  summarise(numberOfResponsesIncentivised = sum(n))
+
+toBeExcluded1 <-
+  left_join(perResponse, nTrials) %>%
+  filter(n >= .95*numberOfResponsesIncentivised)
+
+# For predictions of others' self-isolation
+perResponse <- 
+  exp1GameData %>%
+  filter(group.lockdown == 0) %>%
+  group_by(participant.code, player.others_prediction) %>%
+  summarise(n = n()) %>%
+  filter(!is.na(player.others_prediction))
+
+nTrials <- 
+  perResponse %>% 
+  group_by(participant.code) %>%
+  summarise(numberOfResponsesPredict = sum(n))
+
+toBeExcluded2 <- 
+  left_join(perResponse, nTrials) %>%
+  filter(n >= .95*numberOfResponsesPredict)
+
+  
+# We will use H2bdata to do the same for the hypotheticals. Borrowing this dataset creation from below.
+H2bData <-
+  exp1GameData %>%
+  filter(group.lockdown == 0) %>%
+  pivot_longer(cols = c("player.second_player_contribution_0", "player.second_player_contribution_1", 
+                        "player.second_player_contribution_2", "player.second_player_contribution_3",
+                        "player.second_player_contribution_4"),
+               names_to = "AssumedOthersSelfIsolation",
+               values_to = "HypotheticalSelfIsolation") %>%
+  mutate(AssumedOthersSelfIsolation = as.numeric(substr(AssumedOthersSelfIsolation, start = 35, stop = 36)))
+
+perResponse <- 
+  H2bData %>%
+  filter(group.lockdown == 0) %>%
+  group_by(participant.code, HypotheticalSelfIsolation) %>%
+  summarise(n = n()) %>%
+  filter(!is.na(HypotheticalSelfIsolation))
+
+nTrials <- 
+  perResponse %>% 
+  group_by(participant.code) %>%
+  summarise(numberOfResponsesHypothetical = sum(n))
+
+toBeExcluded3 <- 
+  left_join(perResponse, nTrials) %>%
+  filter(n >= .95*numberOfResponsesHypothetical)
+  
+# Partial participant exclusions:
+  
+exp1GameData <-   
+  exp1GameData %>%
+    group_by(participant.code) %>%  
+    mutate(player.contribution = ifelse(participant.code %in% toBeExcluded1$participant.code, NA, player.contribution),
+         player.others_prediction = ifelse(participant.code %in% toBeExcluded2$participant.code, NA, player.others_prediction),
+         player.second_player_contribution_0 = ifelse(participant.code %in% toBeExcluded3$participant.code, NA, player.second_player_contribution_0),
+         player.second_player_contribution_1 = ifelse(participant.code %in% toBeExcluded3$participant.code, NA, player.second_player_contribution_1),
+         player.second_player_contribution_2 = ifelse(participant.code %in% toBeExcluded3$participant.code, NA, player.second_player_contribution_2),
+         player.second_player_contribution_3 = ifelse(participant.code %in% toBeExcluded3$participant.code, NA, player.second_player_contribution_3),
+         player.second_player_contribution_4 = ifelse(participant.code %in% toBeExcluded3$participant.code, NA, player.second_player_contribution_4)) %>%
+  ungroup()
+  
+# Full participant exclusions:
+
+#H1Data <- 
+  H1Data %>%
+  filter(!(participant.code %in% toBeExcluded1$participant.code & participant.code %in% toBeExcluded2$participant.code & participant.code %in% toBeExcluded3$participant.code))
+
+H2bData <-
+  H2bData %>%
+  filter(!(participant.code %in% toBeExcluded1$participant.code & participant.code %in% toBeExcluded2$participant.code & participant.code %in% toBeExcluded3$participant.code))
+
+H4Data <-
+  H4Data %>%
+  filter(!(participant.code %in% toBeExcluded1$participant.code & participant.code %in% toBeExcluded2$participant.code & participant.code %in% toBeExcluded3$participant.code))
+
+H5Data <-
+  H5Data %>%
+  filter(!(participant.code %in% toBeExcluded1$participant.code & participant.code %in% toBeExcluded2$participant.code & participant.code %in% toBeExcluded3$participant.code))
+
+#rm(perResponse, nTrials, toBeExcluded1, toBeExcluded2, toBeExcluded3)
+
+```
+
+
+```{r Datasets for each hypothesis}
+
+H1Data <- 
+  exp1GameData %>% 
+  filter(group.lockdown == 0) %>%
+  mutate(subsession.round_number = subsession.round_number - mean(subsession.round_number, na.rm = T),
+         group.total_infections = group.total_infections - mean(group.total_infections, na.rm = T),
+         group.lockdown_cost = group.lockdown_cost - mean(group.lockdown_cost, na.rm = T),
+         player.others_prediction = player.others_prediction - mean(player.others_prediction, na.rm = T),
+         lastRoundOthers = lastRoundOthers - mean(lastRoundOthers, na.rm = T))
+
+H2bData <-
+  exp1GameData %>%
+  filter(group.lockdown == 0) %>%
+  pivot_longer(cols = c("player.second_player_contribution_0", "player.second_player_contribution_1", 
+                        "player.second_player_contribution_2", "player.second_player_contribution_3",
+                        "player.second_player_contribution_4"),
+               names_to = "AssumedOthersSelfIsolation",
+               values_to = "HypotheticalSelfIsolation") %>%
+  mutate(AssumedOthersSelfIsolation = as.numeric(substr(AssumedOthersSelfIsolation, start = 35, stop = 36)))
+
+H4Data <- 
+  exp1GameData %>%
+  filter(group.lockdown == 0) %>%
+  mutate(PredictedHypothetical = ifelse(player.others_prediction == 0, player.second_player_contribution_0,
+                                        ifelse(player.others_prediction == 1,player.second_player_contribution_1,
+                                               ifelse(player.others_prediction == 2, player.second_player_contribution_2,
+                                                      ifelse(player.others_prediction == 3, player.second_player_contribution_3, 
+                                                             ifelse(player.others_prediction == 4, player.second_player_contribution_4, NA)))))) %>%
+  group_by(participant.code) %>%
+  summarise(IncentivisedSelfIsolation = mean(player.contribution, na.rm = T),
+            HypotheticalSelfIsolation = mean(PredictedHypothetical, na.rm = T)) %>%
+  pivot_longer(cols = c("IncentivisedSelfIsolation", "HypotheticalSelfIsolation"),
+               names_to = "Type",
+               values_to = "SelfIsolation")
+
+H5Data <-
+  exp1GameData %>%
+  filter(group.lockdown == 0) %>%
+  group_by(participant.code, group.lockdown_cost) %>%
+  summarise(SelfIsolation = mean(player.contribution))
+
+
+```
+
+
+
+```{r Experiment 1 Analysis}
+exp1GameData %>% group_by(gender) %>% summarise(contribution = mean(player.contribution))
+exp1GameData %>% group_by(age) %>% summarise(contribution = mean(player.contribution), n = n())
+
+
+#H1. Players’ incentivised self-isolation level is higher if the number of infections in the group is higher.
+#H2. (i) Players’ incentivised self-isolation level is lower if their predictions of others’ degree of self-isolation are higher.
+
+
+
+H1and2aResults <-
+  mixed(player.contribution ~
+          subsession.round_number +
+          group.total_infections +
+          group.lockdown_cost +
+          player.others_prediction +
+          lastRoundOthers +
+          (subsession.round_number|participant.code),
+        data = H1Data)
+
+nice(H1and2aResults)
+
+
+# H2. (ii) Players' hypothetical self-isolation level is lower for higher levels of others' self-isolation.
+
+
+
+H2bResults <-
+  mixed(HypotheticalSelfIsolation ~
+          AssumedOthersSelfIsolation +
+          lastRoundOthers +
+          group.total_infections +
+          subsession.round_number +
+          (subsession.round_number|participant.code),
+        data = H2bData)
+
+nice(H2bResults)
+
+
+# H3. Predictions of others' degree of self-isolation will be influenced by the number of total infections in the group. 
+#     That is, players infer that with more positive cases, the others are self-isolating to a lower degree.
+
+H3Results <-
+  mixed(player.others_prediction ~
+          lastRoundOthers +
+          group.total_infections +
+          subsession.round_number +
+          (subsession.round_number|participant.code),
+        data = H1Data)
+
+nice(H3Results)
+
+# H4. Incentivisation decreases self-isolation level. Incentivised self-isolation level is lower than their hypothetical self-isolation level.
+
+
+
+H4Results <- wilcox.test(SelfIsolation ~ Type, data = H4Data, paired = T)
+
+# H5. Incentivised self-isolation level is higher when the cost of lockdown is higher.
+
+
+
+H5Results <- wilcox.test(SelfIsolation ~ group.lockdown_cost, data = H5Data, paired = T)
+
+```
+
+## Pilot stuff
+
+```{r Pilot Analysis}
+
+PilotLmmContribution <-
+  mixed(player.contribution ~
+          subsession.round_number +
+          group.total_infections +
+          factor(player.my_endowment) +
+          (subsession.round_number|session.code/participant.code),
+        data = publicGoodsData)
+nice(lmmContribution)
+
+
+
+```
+
+
 
 ```{r Figures for visualisation}
 ggplot(publicGoodsData, aes(x = player.contribution, 
@@ -266,61 +511,13 @@ ggarrange(a, b, c, d, e) +
 
 ```
 
-```{r P Game v C Game plot}
-SummaryData <- publicGoodsData %>%
-  filter(!is.na(actualMinusModerate)) %>%
-  group_by(group.total_infections) %>%
-  summarise(`None (0)` = mean(actualMinusNo),
-            `Slight (1)` = mean(actualMinusSlight),
-            `Moderate (2)` = mean(actualMinusModerate),
-            `Stringent (3)` = mean(actualMinusStringent),
-            `Complete (4)` = mean(actualMinusComplete),
-            `Actual Contribution` = mean(player.contribution)) %>%
-  pivot_longer(cols = 2:6, names_to = "assumedAverageContribution", values_to = "value") %>%
-  mutate(assumedAverageContribution = factor(assumedAverageContribution,
-                                             levels = c("None (0)",
-                                                        "Slight (1)",
-                                                        "Moderate (2)",
-                                                        "Stringent (3)",
-                                                        "Complete (4)"
-                                                        )))
-
-ggplot(SummaryData %>% 
-         filter(group.total_infections < 5), 
-       aes(x = assumedAverageContribution, 
-                        y = group.total_infections,
-                        size = `Actual Contribution`,
-                        col = value)) +
-  geom_point() +
-  scale_colour_gradient2(low = "red", mid = 'green', high = "red") +
-  labs(x = 'Assumed self-isolation of others',
-       y = 'Number of infections in the group',
-       size = 'Actual Average\nContribution',
-       col = 'Difference Incentivised-Hypothetical') +
- # scale_size(range = c(6, 8)) + 
-  scale_size_binned(range = c(4, 8)) +
-  theme_light() +
-  theme(axis.text.x = element_text(size = 7))
-
-
-ggplot(SummaryData %>% 
-         filter(group.total_infections < 5), 
-       aes(x = assumedAverageContribution, 
-                        y = group.total_infections,
-                        col = value)) +
-  geom_point(size = 7) +
-  scale_colour_gradient2(low = "red", mid = 'green', high = "red") +
-  labs(x = 'Assumed self-isolation of others',
-       y = 'Number of infections in the group',
-       col = 'Difference Incentivised-Hypothetical') +
- # scale_size(range = c(6, 8)) + 
-  scale_size_binned(range = c(4, 8)) +
-  theme_light() +
-  theme(axis.text.x = element_text(size = 7))
 
 
 
-```
+
+
+Extra materials.
+
 
 ```{r Descriptives}
 
@@ -335,44 +532,8 @@ publicGoodsData %>%
             `Second Player Contribution - Stringent` = mean(player.second_player_contribution_3, na.rm = T),
             `Second Player Contribution - Complete` = mean(player.second_player_contribution_4, na.rm = T))
 
-
-
 ```
 
-
-```{r Analysis}
-
-lmmContribution <-
-  mixed(player.contribution ~
-          subsession.round_number +
-          group.total_infections +
-          factor(player.my_endowment) +
-          (subsession.round_number|session.code/participant.code),
-        data = publicGoodsData)
-nice(lmmContribution)
-
-publicGoodsData <- 
-  publicGoodsData %>%
-  mutate(actualMinusNo = player.contribution-player.second_player_contribution_0,
-    actualMinusSlight = player.contribution-player.second_player_contribution_1,
-    actualMinusModerate = player.contribution-player.second_player_contribution_2,
-    actualMinusStringent = player.contribution-player.second_player_contribution_3,
-    actualMinusComplete = player.contribution-player.second_player_contribution_4)
-
-SummaryData <- publicGoodsData %>%
-  filter(!is.na(actualMinusModerate)) %>%
-  group_by(group.total_infections) %>%
-  summarise(`No Self-Isolation` = mean(actualMinusNo),
-            `Slight Self-Isolation` = mean(actualMinusSlight),
-            `Moderate Self-Isolation` = mean(actualMinusModerate),
-            `Stringent Self-Isolation` = mean(actualMinusStringent),
-            `Complete Self-Isolation` = mean(actualMinusComplete),
-            `Actual Contribution` = mean(player.contribution)) %>%
-  pivot_longer(cols = 2:6, names_to = "assumedAverageContribution", values_to = "value")
-
-
-
-```
 
 ```{r Role splitting, warning=FALSE}
 
@@ -422,101 +583,6 @@ triangleContributorData <-
 
 
 
-
-
-
-
-```
-
-```{r power, warning=FALSE}
-
-n <- 216
-meanDifference = .45
-numSims = 100
-i <- 0
-set.seed(1)
-powerByN <- tibble(power = 0)
-pValues <- tibble(pValue = 0)
-
-for (i in 1:numSims) {
-powerData <- tibble(stayHome = c(rnorm(n/2, 2.45, .9), rnorm(n/2, 2.45-meanDifference, 9)),
-                    framing = factor(rep(c(1,2), each = n/2)),
-                    session = factor(c(rep(seq(1:(n/9)), each = 9))))
-a <- t.test(selfIsolation ~ framing, data = powerData %>% group_by(framing, session) %>% summarise(selfIsolation = mean(stayHome)))
-pValues[i,1] <- as.numeric(a$p.value)
-}
-
-powerByN <- powerByN %>%
-  mutate(power = pValues %>% filter(pValue < .05) %>% nrow()/numSims)
-
-nmin <- 50
-nmax <- 300
-step <- 50
-nVector <- seq(nmin, nmax, step) # A vector specifying how many participants per simulation set.
-
-nsim <- 1000 # number of simulations, for your final version, the benchmark is doing 10.000 simulations
-
-simValues <- tibble(pValue = NA, 
-                     ControlMean = NA, 
-                     TreatmentMean = NA)
-sim.power.by.n <- tibble(n = nVector, power = NA)
-
-# Timing the code
-start_time <- Sys.time()
-
-i=1
-j=1
-set.seed(1) # ALWAYS set the seed for reproducibility! R can only create pseudo random numbers, not actual random numbers. If you set the seed, you will get the same results every time, because the same pseudo random numbers will be produced.
-
-for (j in 1:length(nVector)) {
-  for (i in 1:nsim) {
-    DataSimulation <- tibble(
-      SubjectId = factor(adjective_animal(nVector[j], max_len = 5)),
-      b0 = constant,
-      b1 = effectSize,
-      x = (rep(c(1,0), times = nVector[j]/2)), #Here I multiply it by n/2 because it is a between design, see what happens if you multiply by nVector.
-      e = rnorm(nVector[j], 0, error), #Introducing variation in the outcome variable.
-      y = b0 + b1*x + e)
-    
-    a <- t.test(y ~ x, data = DataSimulation) # Here it would be more elegant to use lm instead of a t-test, but I will not, for the sake of simplicity.
-    simValues[i,1] <- a$p.value # Each observation in this column is a p-value
-    simValues[i,2:3] <- a$estimate # Each observation in these columns is a mean.
-    i=i+1
-  }
-  simValues$pValue <- as.numeric(ifelse(simValues$pValue == '<.0001', .0001, simValues$pValue)) # Fix an issue with the t-test output format of p-values, it's crude, but it works.
-  sim.power.by.n[j,2] <- simValues %>% filter(pValue < 0.05) %>% nrow/nsim ## We filter on p<0.05, and then see what the proportion of simulations have that.
-  cat("R is finished with simulation set",j, "out of", length(nVector), ".\n")
-  j=j+1
-}
-
-# Timing again, to see how long the simulations took.
-end_time <- Sys.time()
-RunTime <- end_time - start_time
-cat("It took R ", RunTime, " seconds/minutes to run these simulations." )
-
-# Step 7 - Graph your results. Again, please create more graphs than this, for your own understanding of the data.
-
-powerPlot <- ggplot(data=sim.power.by.n, aes(x=n, y=power)) +
-              geom_line() +
-              geom_point() +
-              theme_minimal() +
-              ylim(0.2, 1)
-
-#This one only uses the last simulation set, this can be made to be more elaborate.
-meanDensity <- simValues %>% gather(c(ControlMean, TreatmentMean), key = 'Treatment', value = 'LLProportion')
-meanDenistyPlot <- ggplot(meanDensity, aes(x = LLProportion, fill = Treatment)) +
-                    geom_density(alpha = 0.4)
-
-powerPlot
-
-meanDenistyPlot
-
-# Now you can play with all the values, parameters and complexity to make the most accurate power analysis.
-
-
-
-
 ```
 
 
-```
