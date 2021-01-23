@@ -18,7 +18,7 @@ library(broom)
 
 ```
 
-```{r load data, include = F}
+```{r load data, include = FALSE}
 publicGoodsData <- read_csv('CleanedPublicGoods.csv') %>%
   filter(subsession.round_number <= 20)
 exp1GameData <- read_csv("Exp1PublicGoodsCleaned.csv")
@@ -186,10 +186,9 @@ H5Data <-
 
 
 
-```{r Experiment 1 Analysis, silent = T}
+```{r Experiment 1 Analysis, include=FALSE}
 
-#H1. Players’ incentivised self-isolation level is higher if the number of infections in the group is higher.
-#H2. (i) Players’ incentivised self-isolation level is lower if their predictions of others’ degree of self-isolation are higher.
+
 
 
 H1and2aResults <-
@@ -202,12 +201,10 @@ H1and2aResults <-
           (subsession.round_number|participant.code),
         data = H1Data)
 
-nice(H1and2aResults)
-
-emtrends(H1and2aResults, "group.lockdown_cost", "subsession.round_number")
 
 
-# H2. (ii) Players' hypothetical self-isolation level is lower for higher levels of others' self-isolation.
+
+
 
 
 
@@ -220,11 +217,6 @@ H2bResults <-
           (subsession.round_number|participant.code),
         data = H2bData)
 
-summary(H2bResults)
-
-
-# H3. Predictions of others' degree of self-isolation will be influenced by the number of total infections in the group. 
-#     That is, players infer that with more positive cases, the others are self-isolating to a lower degree.
 
 H3Results <-
   mixed(player.others_prediction ~
@@ -234,22 +226,44 @@ H3Results <-
           (subsession.round_number|participant.code),
         data = H1Data)
 
-nice(H3Results)
 
-summary(H3Results)
 
-# H4. Incentivisation decreases self-isolation level. Incentivised self-isolation level is lower than their hypothetical self-isolation level.
+
+
+
 
 
 H4Results <- wilcox.test(SelfIsolation ~ Type, data = H4Data, paired = T)
-H4Results
-# H5. Incentivised self-isolation level is higher when the cost of lockdown is higher.
 
 
 H5Results <- wilcox.test(SelfIsolation ~ group.lockdown_cost, data = H5Data, paired = T)
-H5Results
-```
 
+```
+```{r Results}
+#H1. Players’ incentivised self-isolation level is higher if the number of infections in the group is higher.
+#H2a. Players’ incentivised self-isolation level is lower if their predictions of others’ degree of self-isolation are higher.
+
+nice(H1and2aResults)
+
+# H2b. Players' hypothetical self-isolation level is lower for higher levels of others' self-isolation.
+
+summary(H2bResults)
+
+# H3. Predictions of others' degree of self-isolation will be influenced by the number of total infections in the group. 
+#     That is, players infer that with more positive cases, the others are self-isolating to a lower degree.
+
+nice(H3Results)
+
+# H4. Incentivisation decreases self-isolation level. Incentivised self-isolation level is lower than their hypothetical self-isolation level.
+
+H4Results
+
+
+# H5. Incentivised self-isolation level is higher when the cost of lockdown is higher.
+
+H5Results
+
+```
 
 ```{r Visualisation Experiment 1}
 
@@ -408,7 +422,7 @@ ggplot(lockdownCostData, aes(x = factor(group.lockdown_cost), y = SelfIsolation,
 
 ## Pilot stuff
 
-```{r Pilot Analysis, include = FALSE}
+```{r Pilot Analysis, eval = FALSE}
 
 PilotLmmContribution <-
   mixed(player.contribution ~
@@ -425,7 +439,7 @@ nice(lmmContribution)
 
 
 
-```{r Figures for visualisation, include = FALSE}
+```{r Figures for visualisation, eval = FALSE}
 ggplot(publicGoodsData, aes(x = player.contribution, 
                             fill = group.condition)) +
   geom_density(alpha = .4) +
@@ -529,7 +543,7 @@ ggplot(publicGoodsData %>%
 ```
 
 
-```{r P Game figures, include = FALSE}
+```{r P Game figures, eval = FALSE}
 
 pGameOthers #  <-
   ggplot(publicGoodsData %>% 
@@ -619,7 +633,7 @@ ggarrange(pGameOthers, pGameInfections) +
 ```
 
 
-```{r second player comparison, include = FALSE}
+```{r second player comparison, eval = FALSE}
 
 a <- ggplot(publicGoodsData %>% filter(!is.na(player.second_player_contribution_0)), 
        (aes(x = factor(player.second_player_contribution_0), y = player.contribution, col = group.total_infections))) +
@@ -672,12 +686,7 @@ ggarrange(a, b, c, d, e) +
 
 
 
-
-
-Extra materials.
-
-
-```{r Descriptives, include = FALSE}
+```{r Descriptives, eval = FALSE}
 
 View(publicGoodsData %>% filter(group.total_infections < 6) %>% group_by(group.condition, group.total_infections) %>% summarise(lockdown = mean(player.contribution, na.rm = T)))
 
@@ -693,7 +702,7 @@ publicGoodsData %>%
 ```
 
 
-```{r Role splitting, include = FALSE}
+```{r Role splitting, eval = FALSE}
 
 rolesData <- 
   publicGoodsData %>%
