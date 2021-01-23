@@ -112,23 +112,7 @@ exp1GameData <-
          player.second_player_contribution_4 = ifelse(participant.code %in% toBeExcluded3$participant.code, NA, player.second_player_contribution_4)) %>%
   ungroup()
   
-# Full participant exclusions:
-
-#H1Data <- 
-  H1Data %>%
-  filter(!(participant.code %in% toBeExcluded1$participant.code & participant.code %in% toBeExcluded2$participant.code & participant.code %in% toBeExcluded3$participant.code))
-
-H2bData <-
-  H2bData %>%
-  filter(!(participant.code %in% toBeExcluded1$participant.code & participant.code %in% toBeExcluded2$participant.code & participant.code %in% toBeExcluded3$participant.code))
-
-H4Data <-
-  H4Data %>%
-  filter(!(participant.code %in% toBeExcluded1$participant.code & participant.code %in% toBeExcluded2$participant.code & participant.code %in% toBeExcluded3$participant.code))
-
-H5Data <-
-  H5Data %>%
-  filter(!(participant.code %in% toBeExcluded1$participant.code & participant.code %in% toBeExcluded2$participant.code & participant.code %in% toBeExcluded3$participant.code))
+# Full participant exclusions Will be carried out in the hypothesis-bound datasets below.
 
 #rm(perResponse, nTrials, toBeExcluded1, toBeExcluded2, toBeExcluded3)
 
@@ -175,21 +159,37 @@ H5Data <-
   exp1GameData %>%
   filter(group.lockdown == 0) %>%
   group_by(participant.code, group.lockdown_cost) %>%
-  summarise(SelfIsolation = mean(player.contribution))
+  summarise(SelfIsolation = mean(player.contribution, na.rm = T))
+
+
+# Full participant exclusions.
+
+H1Data <- 
+  H1Data %>%
+  filter(!(participant.code %in% toBeExcluded1$participant.code & participant.code %in% toBeExcluded2$participant.code & participant.code %in% toBeExcluded3$participant.code),
+         player.timeout != 1)
+
+H2bData <-
+  H2bData %>%
+  filter(!(participant.code %in% toBeExcluded1$participant.code & participant.code %in% toBeExcluded2$participant.code & participant.code %in% toBeExcluded3$participant.code))
+
+H4Data <-
+  H4Data %>%
+  filter(!(participant.code %in% toBeExcluded1$participant.code & participant.code %in% toBeExcluded2$participant.code & participant.code %in% toBeExcluded3$participant.code))
+
+H5Data <-
+  H5Data %>%
+  filter(!(participant.code %in% toBeExcluded1$participant.code & participant.code %in% toBeExcluded2$participant.code & participant.code %in% toBeExcluded3$participant.code))
 
 
 ```
 
 
 
-```{r Experiment 1 Analysis}
-exp1GameData %>% group_by(gender) %>% summarise(contribution = mean(player.contribution))
-exp1GameData %>% group_by(age) %>% summarise(contribution = mean(player.contribution), n = n())
-
+```{r Experiment 1 Analysis, silent = T}
 
 #H1. Players’ incentivised self-isolation level is higher if the number of infections in the group is higher.
 #H2. (i) Players’ incentivised self-isolation level is lower if their predictions of others’ degree of self-isolation are higher.
-
 
 
 H1and2aResults <-
@@ -204,13 +204,15 @@ H1and2aResults <-
 
 nice(H1and2aResults)
 
+emmeans(H1and2aResults, )
+
 
 # H2. (ii) Players' hypothetical self-isolation level is lower for higher levels of others' self-isolation.
 
 
 
 H2bResults <-
-  mixed(HypotheticalSelfIsolation ~
+  lmer(HypotheticalSelfIsolation ~
           AssumedOthersSelfIsolation +
           lastRoundOthers +
           group.total_infections +
@@ -218,7 +220,7 @@ H2bResults <-
           (subsession.round_number|participant.code),
         data = H2bData)
 
-nice(H2bResults)
+summary(H2bResults)
 
 
 # H3. Predictions of others' degree of self-isolation will be influenced by the number of total infections in the group. 
@@ -237,16 +239,57 @@ nice(H3Results)
 # H4. Incentivisation decreases self-isolation level. Incentivised self-isolation level is lower than their hypothetical self-isolation level.
 
 
-
 H4Results <- wilcox.test(SelfIsolation ~ Type, data = H4Data, paired = T)
-
+H4Results
 # H5. Incentivised self-isolation level is higher when the cost of lockdown is higher.
 
 
-
 H5Results <- wilcox.test(SelfIsolation ~ group.lockdown_cost, data = H5Data, paired = T)
+H5Results
+```
+
+
+```{r Visualisation Experiment 1}
+
+## H1
+infectionData <-
+  exp1GameData %>%
+  filter(group.total_infections < 6) %>%
+  group_by(group.total_infections) %>%
+  summarise(`Incentivised Self-isolation` = mean(player.contribution, na.rm = T),
+            ci = sd(player.contribution, na.rm = T)/sqrt(n())*1.96)
+
+
+ggplot(infectionData, aes(x = factor(group.total_infections), y = `Incentivised Self-isolation`)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = `Incentivised Self-isolation`-ci, ymax = `Incentivised Self-isolation`+ci), width = .2) +
+  lims(y = c(0,4)) +
+  theme_light()
+
+
+ggplot(exp1GameData, aes(x = player.others_prediction, y = player.contribution)) +
+  geom_point(position = position_jitter(.1)) +
+  geom_smooth(method = 'lm') +
+  theme_light()
+
+
+ggplot(exp1GameData %>% 
+         group_by(subsession.round_number, group.lockdown_cost) %>% 
+         summarise(player.contribution = mean(player.contribution, na.rm = T)), 
+       aes(x = subsession.round_number, y = player.contribution, col = factor(group.lockdown_cost))) + 
+  geom_point() + 
+  geom_smooth(method = 'lm') + 
+  theme_light()
+
+
+
+
+
+
 
 ```
+
+
 
 ## Pilot stuff
 

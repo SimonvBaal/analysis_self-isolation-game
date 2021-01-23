@@ -126,11 +126,11 @@ exp1RawSurvey <-
   exp1RawSurvey %>%
   select(session.code,
          participant.code,
-         age,
-         gender,
-         covid_positive,
-         location,
-         attention_check)
+         player.age,
+         player.gender,
+         player.covid_positive,
+         player.location,
+         player.attention_check)
 
 exp1RawGame <- 
   exp1RawGame %>%
@@ -141,6 +141,7 @@ exp1RawGame <-
          subsession.round_number,
          player.id_in_group,
          player.infected,
+         player.timeout,
          player.cumulative_earnings,
          player.others_prediction,
          player.contribution,
@@ -166,7 +167,12 @@ DNFexp1 <-
   exp1RawGame %>%
   group_by(session.code, participant.code) %>%
   summarise(cumulativeEarnings = max(player.cumulative_earnings)) %>%
-  filter(cumulativeEarnings > 1000, session.code != 'q1uimr6i')
+  filter(cumulativeEarnings > 1500, session.code != 'q1uimr6i')
+
+exp1RawGame %>%
+  filter(player.payoff == 0) %>%
+  group_by(session.code, participant.code) %>%
+  summarise(n = n())
 
 exp1GameData <- 
   exp1RawGame %>% 
