@@ -266,6 +266,12 @@ ggplot(infectionData, aes(x = factor(group.total_infections), y = `Incentivised 
   lims(y = c(0,4)) +
   theme_light()
 
+#======================================================================
+
+#H2a
+
+
+
 
 ggplot(exp1GameData, aes(x = player.others_prediction, y = player.contribution)) +
   geom_point(position = position_jitter(.1)) +

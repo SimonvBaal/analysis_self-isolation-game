@@ -169,11 +169,6 @@ DNFexp1 <-
   summarise(cumulativeEarnings = max(player.cumulative_earnings)) %>%
   filter(cumulativeEarnings > 1500, session.code != 'q1uimr6i')
 
-exp1RawGame %>%
-  filter(player.payoff == 0) %>%
-  group_by(session.code, participant.code) %>%
-  summarise(n = n())
-
 exp1GameData <- 
   exp1RawGame %>% 
   right_join(DNFexp1, 
@@ -184,6 +179,10 @@ exp1GameData <-
 
 exp1GameData <- 
   left_join(exp1GameData, exp1RawSurvey, by = c("session.code", "participant.code"))
+
+exp1GameData %>%
+  group_by(session.code, participant.code) %>%
+  summarise(n = n())
 
 ```
 
