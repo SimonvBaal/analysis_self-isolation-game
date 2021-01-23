@@ -7,7 +7,7 @@ output: html_document
 
 
 This Rmd file contains the analysis of the pilot experiment.
-```{r libraries, warning=F}
+```{r libraries, include = FALSE}
 library(tidyverse)
 library(afex)
 library(ggplot2)
@@ -18,7 +18,7 @@ library(broom)
 
 ```
 
-```{r load data, warning=F}
+```{r load data, include = F}
 publicGoodsData <- read_csv('CleanedPublicGoods.csv') %>%
   filter(subsession.round_number <= 20)
 exp1GameData <- read_csv("Exp1PublicGoodsCleaned.csv")
@@ -29,7 +29,7 @@ exp1GameData <- read_csv("Exp1PublicGoodsCleaned.csv")
 
 
 
-```{r Exclusions}
+```{r Exclusions, include = FALSE}
 # Identify participants with low effort responses.
 
 #If participants give the same answers for the hypothetical decisions at least 95% of the time, 
@@ -119,7 +119,7 @@ exp1GameData <-
 ```
 
 
-```{r Datasets for each hypothesis}
+```{r Datasets for each hypothesis, include = FALSE}
 
 H1Data <- 
   exp1GameData %>% 
@@ -204,7 +204,7 @@ H1and2aResults <-
 
 nice(H1and2aResults)
 
-emmeans(H1and2aResults, )
+emtrends(H1and2aResults, "group.lockdown_cost", "subsession.round_number")
 
 
 # H2. (ii) Players' hypothetical self-isolation level is lower for higher levels of others' self-isolation.
@@ -236,6 +236,8 @@ H3Results <-
 
 nice(H3Results)
 
+summary(H3Results)
+
 # H4. Incentivisation decreases self-isolation level. Incentivised self-isolation level is lower than their hypothetical self-isolation level.
 
 
@@ -251,7 +253,7 @@ H5Results
 
 ```{r Visualisation Experiment 1}
 
-## H1
+#====================================================================== H1
 infectionData <-
   exp1GameData %>%
   filter(group.total_infections < 6) %>%
@@ -263,32 +265,139 @@ infectionData <-
 ggplot(infectionData, aes(x = factor(group.total_infections), y = `Incentivised Self-isolation`)) +
   geom_point() +
   geom_errorbar(aes(ymin = `Incentivised Self-isolation`-ci, ymax = `Incentivised Self-isolation`+ci), width = .2) +
-  lims(y = c(0,4)) +
+  scale_y_continuous(breaks = c(0, 1, 2, 3, 4), 
+                     labels = c('None (0)', 
+                                'Slight (1)' , 
+                                'Moderate (2)', 
+                                'Stringent (3)', 
+                                'Complete (4)'), 
+                     minor_breaks = c(.5, 1.5, 2.5, 3.5),
+                     limits = c(0,4)) +
+  labs(x = "Number of positive cases") +
   theme_light()
 
-#======================================================================
+#====================================================================== H2
 
 #H2a
 
+predictionIncentivisedData <-
+  exp1GameData %>%
+  group_by(player.others_prediction) %>%
+  summarise(SelfIsolation = mean(player.contribution),
+            ci = sd(player.contribution, na.rm = T)/sqrt(n())*1.96)
 
 
-
-ggplot(exp1GameData, aes(x = player.others_prediction, y = player.contribution)) +
-  geom_point(position = position_jitter(.1)) +
-  geom_smooth(method = 'lm') +
+ggplot(predictionIncentivisedData, aes(x = player.others_prediction, y = SelfIsolation)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = SelfIsolation-ci, ymax = SelfIsolation+ci), width = .2) + 
+  scale_y_continuous(breaks = c(0, 1, 2, 3, 4), 
+                     labels = c('None (0)', 
+                                'Slight (1)' , 
+                                'Moderate (2)', 
+                                'Stringent (3)', 
+                                'Complete (4)'), 
+                     minor_breaks = c(.5, 1.5, 2.5, 3.5),
+                     limits = c(0,4)) +
+  scale_x_continuous(breaks = c(0, 1, 2, 3, 4), 
+                     labels = c('None (0)', 
+                                'Slight (1)' , 
+                                'Moderate (2)', 
+                                'Stringent (3)', 
+                                'Complete (4)'), 
+                     minor_breaks = c(.5, 1.5, 2.5, 3.5),
+                     limits = c(-0.2,4.2)) +
+  labs(x = "Prediction of others' behaviour", y = "Incentivised self-isolation") +
   theme_light()
 
 
+#H2b
+
+predictionHypotheticalData <-
+  H2bData %>%
+  group_by(AssumedOthersSelfIsolation) %>%
+  summarise(Hypothetical = mean(HypotheticalSelfIsolation, na.rm = T),
+            ci = sd(HypotheticalSelfIsolation, na.rm = T)/sqrt(n())*1.96)
+
+ggplot(predictionHypotheticalData, aes(x = AssumedOthersSelfIsolation, y = Hypothetical)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = Hypothetical-ci, ymax = Hypothetical+ci), width = .2) + 
+  scale_y_continuous(breaks = c(0, 1, 2, 3, 4), 
+                     labels = c('None (0)', 
+                                'Slight (1)' , 
+                                'Moderate (2)', 
+                                'Stringent (3)', 
+                                'Complete (4)'), 
+                     minor_breaks = c(.5, 1.5, 2.5, 3.5),
+                     limits = c(0,4)) +
+  scale_x_continuous(breaks = c(0, 1, 2, 3, 4), 
+                     labels = c('None (0)', 
+                                'Slight (1)' , 
+                                'Moderate (2)', 
+                                'Stringent (3)', 
+                                'Complete (4)'), 
+                     minor_breaks = c(.5, 1.5, 2.5, 3.5),
+                     limits = c(-0.2,4.2)) +
+  theme_light()
+
+#===================================================================== H3
+
+predictionData <-
+  exp1GameData %>%
+  filter(group.total_infections < 6) %>%
+  group_by(group.total_infections) %>%
+  summarise(Prediction = mean(player.others_prediction, na.rm = T),
+            ci = sd(player.others_prediction, na.rm = T)/sqrt(n())*1.96)
+
+ggplot(predictionData, aes(x = factor(group.total_infections), y = Prediction)) +
+  geom_point() +
+  geom_line() +
+  geom_errorbar(aes(ymin = Prediction-ci, ymax = Prediction+ci), width = .2) +
+  scale_y_continuous(breaks = c(0, 1, 2, 3, 4), 
+                     labels = c('None (0)', 
+                                'Slight (1)' , 
+                                'Moderate (2)', 
+                                'Stringent (3)', 
+                                'Complete (4)'), 
+                     minor_breaks = c(.5, 1.5, 2.5, 3.5),
+                     limits = c(0,4)) +
+  labs(x = "Number of positive cases", y = "Predictions of others' self-isolation") +
+  theme_light()
+
+
+
+#======================================================================= H5
+
 ggplot(exp1GameData %>% 
-         group_by(subsession.round_number, group.lockdown_cost) %>% 
+         group_by(subsession.round_number, Order) %>% 
          summarise(player.contribution = mean(player.contribution, na.rm = T)), 
-       aes(x = subsession.round_number, y = player.contribution, col = factor(group.lockdown_cost))) + 
+       aes(x = subsession.round_number, y = player.contribution, col = Order)) + 
   geom_point() + 
   geom_smooth(method = 'lm') + 
   theme_light()
 
+lockdownCostData <-
+  exp1GameData %>%
+  filter(group.total_infections < 6) %>%
+  group_by(group.lockdown_cost, group.total_infections) %>%
+  summarise(SelfIsolation = mean(player.contribution, na.rm = T),
+            ci = sd(player.others_prediction, na.rm = T)/sqrt(n())*1.96)
 
 
+ggplot(lockdownCostData, aes(x = factor(group.lockdown_cost), y = SelfIsolation, col = factor(group.total_infections), group = factor(group.total_infections))) +
+  geom_point(position = position_dodge(width = .2)) +
+  geom_line(position = position_dodge(width = .2)) +
+  geom_errorbar(aes(ymin = SelfIsolation - ci, ymax = SelfIsolation + ci), width = .2, position = position_dodge(.2)) +
+  scale_y_continuous(breaks = c(0, 1, 2, 3, 4), 
+                     labels = c('None (0)', 
+                                'Slight (1)' , 
+                                'Moderate (2)', 
+                                'Stringent (3)', 
+                                'Complete (4)'), 
+                     minor_breaks = c(.5, 1.5, 2.5, 3.5),
+                     limits = c(1,4)) +
+  labs(x = 'Cost of lockdown (per round)', y = "Incentivised self-isolation") +
+  scale_colour_viridis_d(begin = .1, end = .8) +
+  theme_light()
 
 
 
@@ -299,7 +408,7 @@ ggplot(exp1GameData %>%
 
 ## Pilot stuff
 
-```{r Pilot Analysis}
+```{r Pilot Analysis, include = FALSE}
 
 PilotLmmContribution <-
   mixed(player.contribution ~
@@ -316,7 +425,7 @@ nice(lmmContribution)
 
 
 
-```{r Figures for visualisation}
+```{r Figures for visualisation, include = FALSE}
 ggplot(publicGoodsData, aes(x = player.contribution, 
                             fill = group.condition)) +
   geom_density(alpha = .4) +
@@ -420,7 +529,7 @@ ggplot(publicGoodsData %>%
 ```
 
 
-```{r P Game figures}
+```{r P Game figures, include = FALSE}
 
 pGameOthers #  <-
   ggplot(publicGoodsData %>% 
@@ -510,7 +619,7 @@ ggarrange(pGameOthers, pGameInfections) +
 ```
 
 
-```{r second player comparison}
+```{r second player comparison, include = FALSE}
 
 a <- ggplot(publicGoodsData %>% filter(!is.na(player.second_player_contribution_0)), 
        (aes(x = factor(player.second_player_contribution_0), y = player.contribution, col = group.total_infections))) +
@@ -568,7 +677,7 @@ ggarrange(a, b, c, d, e) +
 Extra materials.
 
 
-```{r Descriptives}
+```{r Descriptives, include = FALSE}
 
 View(publicGoodsData %>% filter(group.total_infections < 6) %>% group_by(group.condition, group.total_infections) %>% summarise(lockdown = mean(player.contribution, na.rm = T)))
 
@@ -584,7 +693,7 @@ publicGoodsData %>%
 ```
 
 
-```{r Role splitting, warning=FALSE}
+```{r Role splitting, include = FALSE}
 
 rolesData <- 
   publicGoodsData %>%

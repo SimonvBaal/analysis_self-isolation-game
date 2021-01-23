@@ -3,7 +3,7 @@ participant.id_in_session,participant.code,participant.label,session.code,player
 2,ics99vz6,5d3cb6625ca28800166c8ffc,ui73b4cc,Chicago,19,Male,0,England
 3,ca56z2zv,5f215ed0456c964f5f1e408d,ui73b4cc,Chicago,29,Female,0,England
 5,wfpzt5z0,5d2464b812b27400011db6e7,ui73b4cc,Chicago,36,Female,0,England
-6,nwr8ut6o,5ca0de7d8001d50018c69031,ui73b4cc,Chicago,,,,
+6,nwr8ut6o,5ca0de7d8001d50018c69031,ui73b4cc,Chicago,29,Male,0,England
 7,wv2ypvol,5b88002a7bb9e90001f0703f,ui73b4cc,Chicago,36,Male,0,England
 9,ri3991uw,5ef3087637ccf9000bbacd57,ui73b4cc,Tokyo,35,Female,0,England
 10,7fuuovrt,5e49c48fac17f4000c1bfcbc,ui73b4cc,Chicago,39,Female,0,Northern Ireland

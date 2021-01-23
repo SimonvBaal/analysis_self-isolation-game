@@ -178,7 +178,8 @@ exp1GameData <-
   mutate(lastRoundOthers = lag(player.others_contribution_percentage))
 
 exp1GameData <- 
-  left_join(exp1GameData, exp1RawSurvey, by = c("session.code", "participant.code"))
+  left_join(exp1GameData, exp1RawSurvey, by = c("session.code", "participant.code")) %>%
+  mutate(Order = factor(ifelse(subsession.round_number <= 20 & group.lockdown_cost == 60 | subsession.round_number > 20 & group.lockdown_cost == 90, "Low Cost First", "High Cost First")))
 
 exp1GameData %>%
   group_by(session.code, participant.code) %>%
