@@ -6,7 +6,7 @@ output: html_document
 ---
 
 
-This Rmd file contains the analysis of the pilot experiment.
+This Rmd file contains the analysis of the pilot experiment and the first experiment.
 ```{r libraries, include = FALSE}
 library(tidyverse)
 library(afex)
@@ -14,8 +14,10 @@ library(ggplot2)
 library(ggpubr)
 library(emmeans)
 library(broom)
+library(stargazer)
 
 ```
+
 
 ```{r load data, include = FALSE}
 publicGoodsData <- read_csv('CleanedPublicGoods.csv') %>%
@@ -23,9 +25,6 @@ publicGoodsData <- read_csv('CleanedPublicGoods.csv') %>%
 exp1GameData <- read_csv("Exp1PublicGoodsCleaned.csv")
 
 ```
-
-
-
 
 
 ```{r Exclusions, include = FALSE}
@@ -122,108 +121,100 @@ exp1GameData <-
 
 H1Data <- 
   exp1GameData %>% 
-  filter(group.lockdown == 0) %>%
-  mutate(subsession.round_number = subsession.round_number - mean(subsession.round_number, na.rm = T),
-         group.total_infections = group.total_infections - mean(group.total_infections, na.rm = T),
-         group.lockdown_cost = group.lockdown_cost - mean(group.lockdown_cost, na.rm = T),
-         player.others_prediction = player.others_prediction - mean(player.others_prediction, na.rm = T),
-         lastRoundOthers = lastRoundOthers - mean(lastRoundOthers, na.rm = T))
+  filter(group.lockdown == 0, group.total_infections < 6,
+         !(participant.code %in% toBeExcluded1$participant.code & participant.code %in% toBeExcluded2$participant.code),
+         player.timeout != 1) %>%
+  mutate(centeredRoundNumber = scale(subsession.round_number, scale = F),
+         centeredCases = scale(group.total_infections, scale = F),
+         centeredLockdownCost = scale(group.lockdown_cost, scale = F),
+         centeredPrediction = scale(player.others_prediction, scale = F),
+         centeredLastRoundOthers = scale(lastRoundOthers, scale = F))
 
 H2bData <-
   exp1GameData %>%
-  filter(group.lockdown == 0) %>%
+  filter(group.lockdown == 0,
+         !(participant.code %in% toBeExcluded3$participant.code)) %>%
   pivot_longer(cols = c("player.second_player_contribution_0", "player.second_player_contribution_1", 
                         "player.second_player_contribution_2", "player.second_player_contribution_3",
                         "player.second_player_contribution_4"),
                names_to = "AssumedOthersSelfIsolation",
                values_to = "HypotheticalSelfIsolation") %>%
-  mutate(AssumedOthersSelfIsolation = as.numeric(substr(AssumedOthersSelfIsolation, start = 35, stop = 36)))
+  mutate(AssumedOthersSelfIsolation = as.numeric(substr(AssumedOthersSelfIsolation, start = 35, stop = 36))*10,
+         centeredRoundNumber = scale(subsession.round_number, scale = F),
+         centeredCases = scale(group.total_infections, scale = F),
+         centeredLockdownCost = scale(group.lockdown_cost, scale = F),
+         centeredScenario = scale(AssumedOthersSelfIsolation, scale = F),
+         centeredLastRoundOthers = scale(lastRoundOthers, scale = F))
 
 H4Data <- 
   exp1GameData %>%
-  filter(group.lockdown == 0) %>%
+  filter(group.lockdown == 0,
+         !(participant.code %in% toBeExcluded1$participant.code & participant.code %in% toBeExcluded2$participant.code & participant.code %in% toBeExcluded3$participant.code)) %>%
   mutate(PredictedHypothetical = ifelse(player.others_prediction == 0, player.second_player_contribution_0,
-                                        ifelse(player.others_prediction == 1,player.second_player_contribution_1,
-                                               ifelse(player.others_prediction == 2, player.second_player_contribution_2,
-                                                      ifelse(player.others_prediction == 3, player.second_player_contribution_3, 
-                                                             ifelse(player.others_prediction == 4, player.second_player_contribution_4, NA)))))) %>%
+                                        ifelse(player.others_prediction == 10,player.second_player_contribution_1,
+                                               ifelse(player.others_prediction == 20, player.second_player_contribution_2,
+                                                      ifelse(player.others_prediction == 30, player.second_player_contribution_3, 
+                                                             ifelse(player.others_prediction == 40, player.second_player_contribution_4, NA)))))) %>%
   group_by(participant.code) %>%
   summarise(IncentivisedSelfIsolation = mean(player.contribution, na.rm = T),
             HypotheticalSelfIsolation = mean(PredictedHypothetical, na.rm = T)) %>%
   pivot_longer(cols = c("IncentivisedSelfIsolation", "HypotheticalSelfIsolation"),
                names_to = "Type",
-               values_to = "SelfIsolation")
+               values_to = "SelfIsolation") %>%
+  filter(!is.nan(SelfIsolation)) %>%
+  group_by(participant.code) %>%
+  filter(n() > 1)
 
 H5Data <-
   exp1GameData %>%
-  filter(group.lockdown == 0) %>%
+  filter(group.lockdown == 0,
+         !(participant.code %in% toBeExcluded1$participant.code & participant.code %in% toBeExcluded2$participant.code & participant.code %in% toBeExcluded3$participant.code)) %>%
   group_by(participant.code, group.lockdown_cost) %>%
-  summarise(SelfIsolation = mean(player.contribution, na.rm = T))
-
-
-# Full participant exclusions.
-
-H1Data <- 
-  H1Data %>%
-  filter(!(participant.code %in% toBeExcluded1$participant.code & participant.code %in% toBeExcluded2$participant.code & participant.code %in% toBeExcluded3$participant.code),
-         player.timeout != 1)
-
-H2bData <-
-  H2bData %>%
-  filter(!(participant.code %in% toBeExcluded1$participant.code & participant.code %in% toBeExcluded2$participant.code & participant.code %in% toBeExcluded3$participant.code))
-
-H4Data <-
-  H4Data %>%
-  filter(!(participant.code %in% toBeExcluded1$participant.code & participant.code %in% toBeExcluded2$participant.code & participant.code %in% toBeExcluded3$participant.code))
-
-H5Data <-
-  H5Data %>%
-  filter(!(participant.code %in% toBeExcluded1$participant.code & participant.code %in% toBeExcluded2$participant.code & participant.code %in% toBeExcluded3$participant.code))
-
+  summarise(SelfIsolation = mean(player.contribution, na.rm = T)) %>%
+  filter(!is.nan(SelfIsolation))
 
 ```
 
 
 
 ```{r Experiment 1 Analysis, include=FALSE}
+emm_options(pbkrtest.limit = 20000, lmerTest.limit = 20000)
 
 H1and2aResults <-
   mixed(player.contribution ~
-          subsession.round_number +
-          group.total_infections +
-          group.lockdown_cost +
-          player.others_prediction +
-          lastRoundOthers +
-          (subsession.round_number|participant.code),
+          centeredRoundNumber +
+          centeredCases +
+          centeredPrediction +
+          centeredLastRoundOthers +
+          (centeredRoundNumber|participant.code),
         data = H1Data)
-
 
 
 H2bResults <-
   mixed(HypotheticalSelfIsolation ~
-          AssumedOthersSelfIsolation +
-          lastRoundOthers +
-          group.total_infections +
-          subsession.round_number +
-          (subsession.round_number|participant.code),
+          centeredScenario +
+          centeredLastRoundOthers +
+          centeredCases +
+          centeredRoundNumber +
+          (centeredRoundNumber|participant.code),
         data = H2bData,
         method = "S")
 
 
-HH3Results <-
+H3Results <-
   mixed(player.others_prediction ~
-          lastRoundOthers +
-          group.total_infections +
-          subsession.round_number +
-          (subsession.round_number|participant.code),
+          centeredLastRoundOthers +
+          centeredCases +
+          centeredRoundNumber +
+          (centeredRoundNumber|participant.code),
         data = H1Data)
 
 
 
-H4Results <- wilcox.test(SelfIsolation ~ Type, data = H4Data, paired = T)
+H4Results <- wilcox.test(SelfIsolation ~ Type, data = H4Data, paired = T, alternative = "greater")
 
 
-H5Results <- wilcox.test(SelfIsolation ~ group.lockdown_cost, data = H5Data, paired = T)
+H5Results <- wilcox.test(SelfIsolation ~ group.lockdown_cost, data = H5Data, paired = T, alternative = "less")
 
 emm_options(pbkrtest.limit = 20000)
 
@@ -234,12 +225,34 @@ emm_options(pbkrtest.limit = 20000)
 ExploratoryAnalysis <- 
   mixed(HypotheticalSelfIsolation ~ 
          AssumedOthersSelfIsolation*group.lockdown_cost + 
-         subsession.round_number + 
+         centeredRoundNumber + 
          (1|participant.code), 
        data = H2bData,
        method = "S")
 
-ExploratoryEmmeans <- emmeans(ExploratoryAnalysis, ~ group.lockdown_cost)
+ExploratoryEmmeans <- 
+  emtrends(ExploratoryAnalysis, var = "AssumedOthersSelfIsolation", specs = "group.lockdown_cost", lmer.df = "satterthwaite")
+
+# Now we test whether predictions are lower than incentivised self-isolation.
+
+IncentivisedPredictionData <-  
+  exp1GameData %>% 
+  filter(group.lockdown == 0, group.total_infections < 6,
+         !(participant.code %in% toBeExcluded1$participant.code & participant.code %in% toBeExcluded2$participant.code & participant.code %in% toBeExcluded3$participant.code),
+         player.timeout != 1) %>% 
+  group_by(participant.code) %>%
+  summarise(IncentivisedSelfIsolation = mean(player.contribution, na.rm = T),
+            Prediction = mean(player.others_prediction, na.rm = T)) %>%
+  pivot_longer(cols = c("IncentivisedSelfIsolation", "Prediction"),
+               names_to = "Type",
+               values_to = "SelfIsolation") %>%
+  filter(!is.nan(SelfIsolation)) %>%
+  group_by(participant.code) %>%
+  filter(n() > 1)
+
+IncentivisedPredictionWilcoxon <-
+  wilcox.test(SelfIsolation ~ Type, data = IncentivisedPredictionData, paired = T, alternative = "greater")
+
 ```
 
 
@@ -249,7 +262,7 @@ ExploratoryEmmeans <- emmeans(ExploratoryAnalysis, ~ group.lockdown_cost)
 #H1. Players’ incentivised self-isolation level is higher if the number of infections in the group is higher.
 #H2a. Players’ incentivised self-isolation level is lower if their predictions of others’ degree of self-isolation are higher.
 
-nice(H1and2aResults)
+summary(H1and2aResults)
 
 # H2b. Players' hypothetical self-isolation level is lower for higher levels of others' self-isolation.
 
@@ -258,27 +271,44 @@ summary(H2bResults)
 # H3. Predictions of others' degree of self-isolation will be influenced by the number of total infections in the group. 
 #     That is, players infer that with more positive cases, the others are self-isolating to a lower degree.
 
-nice(H3Results)
+summary(H3Results)
 
 # H4. Incentivisation decreases self-isolation level. Incentivised self-isolation level is lower than their hypothetical self-isolation level.
 
 H4Results
+H4Data %>% 
+  group_by(Type) %>%
+  summarise(mean = mean(SelfIsolation, na.rm = F),
+            median = median(SelfIsolation),
+            sd = sd(SelfIsolation, na.rm = F))
+qnorm(H4Results$p.value)
 
 
 # H5. Incentivised self-isolation level is higher when the cost of lockdown is higher.
 
 H5Results
-
+H5Data %>% 
+  group_by(group.lockdown_cost) %>%
+  summarise(mean = mean(SelfIsolation, na.rm = F),
+            median = median(SelfIsolation),
+            sd = sd(SelfIsolation, na.rm = F))
+qnorm(H5Results$p.value)
 
 # Exploratory Analysis
 
 summary(ExploratoryAnalysis)
+pairs(ExploratoryEmmeans, reverse = T)
+
+IncentivisedPredictionWilcoxon
+qnorm(IncentivisedPredictionWilcoxon$p.value)
+IncentivisedPredictionData %>%
+  group_by(Type) %>%
+  summarise(mean = mean(SelfIsolation),
+            median = median(SelfIsolation),
+            sd = sd(SelfIsolation))
 
 
 ```
-
-
-
 
 
 ```{r Visualisation Experiment 1}
@@ -299,23 +329,27 @@ infectionData <-
 
 
 predictionIncentivisedPlot <-
-  ggplot(infectionData, aes(x = factor(group.total_infections), y = Mean, col = Type)) +
+  ggplot(infectionData, aes(x = factor(group.total_infections), y = Mean, col = Type, group = Type)) +
   geom_point() +
   geom_line() +
   geom_errorbar(aes(ymin = Mean-Ci, ymax = Mean+Ci), width = .2) +
-  scale_y_continuous(breaks = c(0, 1, 2, 3, 4), 
-                     labels = c('None (0)', 
-                                'Slight (1)' , 
-                                'Moderate (2)', 
-                                'Stringent (3)', 
-                                'Complete (4)'), 
-                     minor_breaks = c(.5, 1.5, 2.5, 3.5),
-                     limits = c(0,4)) +
-  labs(x = "Number of positive cases", y = "Self-isolation level") +
+  scale_y_continuous(breaks = c(0, 10, 20, 30, 40), 
+                     labels = c('None', 
+                                'Slight' , 
+                                'Moderate', 
+                                'Stringent', 
+                                'Complete'), 
+                     minor_breaks = c(5, 15, 25, 35),
+                     limits = c(0,40),
+                     sec.axis = sec_axis(trans=~.*1, name = "Income sacrifice")
+                     ) +
+  labs(x = "Number of infections", y = "Self-isolation level") +
   scale_color_viridis_d(begin = .3, end = .8) +
   theme_light()
 
 predictionIncentivisedPlot
+
+
 
 #====================================================================== H2
 
@@ -325,30 +359,30 @@ predictionIncentivisedData <-
   exp1GameData %>%
   filter(!is.na(player.others_prediction)) %>%
   group_by(player.others_prediction) %>%
-  summarise(SelfIsolation = mean(player.contribution),
+  summarise(SelfIsolation = mean(player.contribution, na.rm = T),
             ci = sd(player.contribution, na.rm = T)/sqrt(n())*1.96)
 
 
 h2aPlot <- 
   ggplot(predictionIncentivisedData, aes(x = player.others_prediction, y = SelfIsolation)) +
   geom_point() +
-  geom_errorbar(aes(ymin = SelfIsolation-ci, ymax = SelfIsolation+ci), width = .2) + 
-  scale_y_continuous(breaks = c(0, 1, 2, 3, 4), 
+  geom_errorbar(aes(ymin = SelfIsolation-ci, ymax = SelfIsolation+ci), width = 2) + 
+  scale_y_continuous(breaks = c(0, 10, 20, 30, 40), 
                      labels = c('None', 
                                 'Slight' , 
                                 'Moderate', 
                                 'Stringent', 
                                 'Complete'), 
-                     minor_breaks = c(.5, 1.5, 2.5, 3.5),
-                     limits = c(0,4)) +
-  scale_x_continuous(breaks = c(0, 1, 2, 3, 4), 
+                     minor_breaks = c(5, 15, 25, 35),
+                     limits = c(0, 40)) +
+  scale_x_continuous(breaks = c(0, 10, 20, 30, 40), 
                      labels = c('None', 
                                 'Slight' , 
                                 'Moderate', 
                                 'Stringent', 
                                 'Complete'), 
-                     minor_breaks = c(.5, 1.5, 2.5, 3.5),
-                     limits = c(-0.2,4.2)) +
+                     minor_breaks = c(5, 15, 25, 35),
+                     limits = c(-2, 42)) +
   labs(x = "Prediction of others' behaviour", y = "Incentivised self-isolation") +
   theme_light()
 
@@ -364,28 +398,29 @@ predictionHypotheticalData <-
 h2bPlot <-
   ggplot(predictionHypotheticalData, aes(x = AssumedOthersSelfIsolation, y = Hypothetical)) +
   geom_point() +
-  geom_errorbar(aes(ymin = Hypothetical-ci, ymax = Hypothetical+ci), width = .2) + 
-  scale_y_continuous(breaks = c(0, 1, 2, 3, 4), 
+  geom_errorbar(aes(ymin = Hypothetical-ci, ymax = Hypothetical+ci), width = 2) + 
+  scale_y_continuous(breaks = c(0, 10, 20, 30, 40), 
                      labels = c('None', 
                                 'Slight' , 
                                 'Moderate', 
                                 'Stringent', 
                                 'Complete'), 
-                     minor_breaks = c(.5, 1.5, 2.5, 3.5),
-                     limits = c(0,4)) +
-  scale_x_continuous(breaks = c(0, 1, 2, 3, 4), 
+                     minor_breaks = c(5, 15, 25, 35),
+                     limits = c(0, 40),
+                     sec.axis = sec_axis(trans = ~.*1, name = "Income sacrifice")) +
+  scale_x_continuous(breaks = c(0, 10, 20, 30, 40), 
                      labels = c('None', 
                                 'Slight' , 
                                 'Moderate', 
                                 'Stringent', 
                                 'Complete'), 
-                     minor_breaks = c(.5, 1.5, 2.5, 3.5),
-                     limits = c(-0.2,4.2)) +
-  labs(x = "Assumed self-isolation by others", y = "Hypothetical self-isolation") +
+                     minor_breaks = c(5, 15, 25, 35),
+                     limits = c(-2, 42)) +
+  labs(x = "Others' self-isolation in scenario", y = "Hypothetical self-isolation") +
   theme_light()
 
 ggarrange(h2aPlot, h2bPlot) +
-  ggsave("H2Plots.png", height = 4, width = 9)
+  ggsave("H2Plots.png", height = 4, width = 9, dpi = "print")
 
 #===================================================================== H3
 
@@ -401,14 +436,15 @@ ggplot(predictionData, aes(x = factor(group.total_infections), y = Prediction)) 
   geom_line() +
   geom_errorbar(aes(ymin = Prediction-ci, ymax = Prediction+ci), width = .2) +
   scale_y_continuous(breaks = c(0, 1, 2, 3, 4), 
-                     labels = c('None (0)', 
-                                'Slight (1)' , 
-                                'Moderate (2)', 
-                                'Stringent (3)', 
-                                'Complete (4)'), 
+                     labels = c('None', 
+                                'Slight' , 
+                                'Moderate', 
+                                'Stringent', 
+                                'Complete'), 
                      minor_breaks = c(.5, 1.5, 2.5, 3.5),
-                     limits = c(0,4)) +
-  labs(x = "Number of positive cases", y = "Predictions of others' self-isolation") +
+                     limits = c(0,4),
+                     sec.axis = sec_axis(trans=~.*10, name = "Income sacrifice")) +
+  labs(x = "Number of infections", y = "Predictions of others' self-isolation") +
   theme_light()
 
 
@@ -418,12 +454,14 @@ ggplot(predictionData, aes(x = factor(group.total_infections), y = Prediction)) 
 lockdownCostData <-
   exp1GameData %>%
   filter(group.total_infections < 6) %>%
-  group_by(group.lockdown_cost) %>%
+  group_by(group.lockdown_cost, group.total_infections) %>%
   summarise(SelfIsolation = mean(player.contribution, na.rm = T),
             ci = sd(player.contribution, na.rm = T)/sqrt(n())*1.96)
 
 
-ggplot(lockdownCostData, aes(x = factor(group.lockdown_cost), y = SelfIsolation)) +
+InfectionsLockdownPlot <- 
+  ggplot(lockdownCostData, aes(x = group.total_infections, 
+                             y = SelfIsolation, col = factor(group.lockdown_cost))) +
   geom_point(position = position_dodge(width = .2)) +
   geom_line(position = position_dodge(width = .2)) +
   geom_errorbar(aes(ymin = SelfIsolation - ci, ymax = SelfIsolation + ci), width = .2, position = position_dodge(.2)) +
@@ -434,9 +472,11 @@ ggplot(lockdownCostData, aes(x = factor(group.lockdown_cost), y = SelfIsolation)
                                 'Stringent', 
                                 'Complete'), 
                      minor_breaks = c(.5, 1.5, 2.5, 3.5),
-                     limits = c(1,4)) +
-  labs(x = 'Cost of lockdown (per round)', y = "Incentivised self-isolation") +
-  scale_colour_viridis_d(begin = .1, end = .8) +
+                     limits = c(0,4),
+                     sec.axis = sec_axis(trans=~.*10)) +
+  labs(x = 'Number of infections', y = "Incentivised self-isolation",
+       col = 'Cost of Lockdown') +
+  scale_colour_viridis_d(begin = .8, end = .1) +
   theme_light()
 
 
@@ -444,6 +484,49 @@ ggplot(lockdownCostData, aes(x = factor(group.lockdown_cost), y = player.contrib
   geom_violin()
 
 ```
+
+
+## Each group's responses to lockdowns.
+
+
+```{r}
+lockdownResponseData <-
+  exp1GameData %>% 
+  group_by(subsession.round_number, session.code, Order) %>%
+  summarise(lockdown = mean(group.lockdown),
+            lockdownCost = factor(mean(group.lockdown_cost)),
+            selfIsolation = mean(player.contribution)) %>%
+  mutate(selfIsolation = ifelse(lockdown == 1, NA, selfIsolation))
+
+lockdownPerGroup <-
+  lockdownResponseData %>% 
+  filter(lockdown > 0)
+
+ggplot(lockdownResponseData, aes(x = subsession.round_number, y = selfIsolation, col = lockdownCost)) +
+  geom_point(size = 1) + 
+  geom_vline(data = lockdownPerGroup, aes(xintercept = subsession.round_number), 
+             col = "dark grey", size = .3) +
+  scale_colour_viridis_d(begin = .1, end = .6) +
+  labs(x = "Round Number", y = "Incentivised Self-isolation", col = "Cost of Lockdown") +
+  scale_y_continuous(breaks = c(0, 1, 2, 3, 4), 
+                     labels = c('None', 
+                                'Slight' , 
+                                'Moderate', 
+                                'Stringent', 
+                                'Complete'), 
+                     minor_breaks = c(.5, 1.5, 2.5, 3.5),
+                     limits = c(0,4),
+                     sec.axis = sec_axis(trans = ~.*10, name = "Income sacrifice")) +
+  theme_light() +
+  facet_wrap(~ Order + session.code, nrow = 2) +
+  theme(strip.text.x = element_text(margin = margin(2, 0, 2, 0))) +
+  ggsave("lockdownResponsePlots.png", width = 10, height = 4)
+
+
+
+```
+
+
 
 ```{r}
 # Hypotheticals by infection levels
@@ -489,38 +572,119 @@ lockdownCostAssumptionData <-
             ci = sd(HypotheticalSelfIsolation, na.rm = T)/sqrt(n())*1.96)
 
 
-ggplot(lockdownCostAssumptionData, 
+LockdownHypotheticalPlot <-
+  ggplot(lockdownCostAssumptionData, 
        aes(x = AssumedOthersSelfIsolation, y = SelfIsolation, col = factor(group.lockdown_cost),
            group = factor(group.lockdown_cost))) +
   geom_point(position = position_dodge(width = .2)) +
   geom_line(position = position_dodge(width = .2)) +
   geom_errorbar(aes(ymin = SelfIsolation - ci, ymax = SelfIsolation + ci), width = .2, position = position_dodge(.2)) +
   scale_y_continuous(breaks = c(0, 1, 2, 3, 4), 
-                     labels = c('None (0)', 
-                                'Slight (1)' , 
-                                'Moderate (2)', 
-                                'Stringent (3)', 
-                                'Complete (4)'), 
+                     labels = c('None', 
+                                'Slight' , 
+                                'Moderate', 
+                                'Stringent', 
+                                'Complete'), 
                      minor_breaks = c(.5, 1.5, 2.5, 3.5),
-                     limits = c(1,3)) +
+                     limits = c(0,4),
+                     sec.axis = sec_axis(trans=~.*10)) +
   scale_x_continuous(breaks = c(0, 1, 2, 3, 4), 
-                     labels = c('None (0)', 
-                                'Slight (1)' , 
-                                'Moderate (2)', 
-                                'Stringent (3)', 
-                                'Complete (4)'), 
+                     labels = c('None', 
+                                'Slight' , 
+                                'Moderate', 
+                                'Stringent', 
+                                'Complete'), 
                      minor_breaks = c(.5, 1.5, 2.5, 3.5),
                      limits = c(-.2,4.2)) +
-  labs(x = "Others' assumed self-isolation", y = "Hypothetical self-isolation", col = "Cost of lockdown") +
-  scale_colour_viridis_d(begin = .1, end = .8) +
+  labs(x = "Self-isolation of others in scenario", y = "Hypothetical self-isolation", col = "Cost of Lockdown") +
+  scale_colour_viridis_d(begin = .8, end = .1) +
   theme_light()
 
+ggarrange(InfectionsLockdownPlot, LockdownHypotheticalPlot, common.legend = T, legend = "bottom") +
+  ggsave("LockdownPlots.png", width  = 8, height = 4)
 
 
 ```
 
 
-## Pilot stuff
+
+## Table
+
+
+
+```{r Table of regression results}
+H1DataStargazer <-
+  H1Data %>%
+  rename(`Incentivised Self-Isolation` = player.contribution,
+         `Round Number` = centeredRoundNumber,
+         `Number of Cases` = centeredCases,
+         `Cost of Lockdown` = centeredLockdownCost,
+         `Prediction` = centeredPrediction,
+         `Others in Previous Round` = centeredLastRoundOthers,
+         `Participant ID` = participant.code)
+
+
+H1and2aResultsLmer <-
+    lmer(`Incentivised Self-Isolation` ~
+              `Round Number` +
+              `Number of Cases` +
+              `Others in Previous Round` +
+              `Prediction` +
+              (`Round Number`|`Participant ID`),
+          data = H1DataStargazer)
+
+class(H1and2aResultsLmer) <- "lmerMod"
+
+H2bDataStargazer <-
+  H2bData %>%
+  rename(`Hypothetical Self-Isolation` = HypotheticalSelfIsolation,
+         `Round Number` = centeredRoundNumber,
+         `Number of Cases` = centeredCases,
+         `Cost of Lockdown` = centeredLockdownCost,
+         `Self-isolation in Scenario` = centeredScenario,
+         `Others in Previous Round` = centeredLastRoundOthers,
+         `Participant ID` = participant.code)
+
+H2bResultsLmer <-
+  lmer(`Hypothetical Self-Isolation` ~
+          `Round Number` +
+          `Number of Cases` + 
+          `Others in Previous Round` +
+          `Self-isolation in Scenario` +
+          (`Round Number`|`Participant ID`),
+        data = H2bDataStargazer)
+
+class(H2bResultsLmer) <- "lmerMod"
+
+
+H3ResultsLmer <-
+  lmer(player.others_prediction ~
+          `Round Number` +
+          `Number of Cases` +
+          `Others in Previous Round` +
+          (`Round Number`|`Participant ID`),
+        data = H1DataStargazer)
+
+class(H3ResultsLmer) <- "lmerMod"
+
+stargazer(H1and2aResultsLmer, 
+          H3ResultsLmer, 
+          H2bResultsLmer,
+          title = "Regression Results H1-H3",
+          out = "regressionTable.htm",
+          dep.var.labels = c("Incentivised <br>Self-isolation", "Predictions About <br>Others", "Hypothetical <br>Self-isolation"),
+          covariate.labels = c("Round Number",
+                               "Number of Cases",
+                               "Others in Previous Round",
+                               "Prediction",
+                               "Assumed Self-isolation <br>of Others"),
+          align = TRUE,
+          no.space = TRUE)
+
+
+```
+
+## Pilot materials
 
 ```{r Pilot Analysis, eval = FALSE}
 
@@ -851,5 +1015,4 @@ triangleContributorData <-
 
 
 ```
-
 

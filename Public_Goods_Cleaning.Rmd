@@ -160,7 +160,8 @@ exp1RawGame <-
          group.total_earnings,
          group.lockdown,
          group.lockdown_number,
-         group.lockdown_cost)
+         group.lockdown_cost,
+         group.patient_zero_switch)
 
 # Excluding participants who did not finish the experiment.
 DNFexp1 <- 
@@ -175,15 +176,19 @@ exp1GameData <-
              by = c("participant.code", 
                              "session.code")) %>%
   arrange(participant.code, subsession.round_number) %>%
-  mutate(lastRoundOthers = lag(player.others_contribution_percentage))
+  mutate(lastRoundOthers = lag(player.others_contribution_percentage),
+         player.contribution = player.contribution*10,
+         player.others_prediction = player.others_prediction*10,
+         player.second_player_contribution_0 = player.second_player_contribution_0*10,
+         player.second_player_contribution_1 = player.second_player_contribution_1*10,
+         player.second_player_contribution_2 = player.second_player_contribution_2*10,
+         player.second_player_contribution_3 = player.second_player_contribution_3*10,
+         player.second_player_contribution_4 = player.second_player_contribution_4*10
+         )
 
 exp1GameData <- 
   left_join(exp1GameData, exp1RawSurvey, by = c("session.code", "participant.code")) %>%
   mutate(Order = factor(ifelse(subsession.round_number <= 20 & group.lockdown_cost == 60 | subsession.round_number > 20 & group.lockdown_cost == 90, "Low Cost First", "High Cost First")))
-
-exp1GameData %>%
-  group_by(session.code, participant.code) %>%
-  summarise(n = n())
 
 ```
 
