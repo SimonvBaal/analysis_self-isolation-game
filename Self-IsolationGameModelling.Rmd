@@ -1,0 +1,329 @@
+---
+title: "Self-Isolation Game Modelling"
+author: "Simon van Baal"
+date: "21/05/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(data.table)
+
+```
+
+
+```{r Parameters, warning=FALSE}
+
+HighIncomeLockdown = 40
+LowIncomeLockdown = 10
+
+# Possible strategies given here:
+OwnStrategies <- c("Stringent to Abandonment",
+    "Infection Matcher",
+    "Unconditional Cooperator",
+    "Stringent Cooperator",
+    "Moderate Cooperator",
+    "Slight Cooperator",
+    "Defector")
+
+
+```
+
+
+```{r New version}
+SelfIsolationGame <- function(LockdownIncome, OwnStrategies, GroupStrategies, nSims = 250) {
+  set.seed(123)
+  nPlayers = 11
+  lockdownThreshold = 6
+  round = 1
+  nRounds = 20
+  
+# Populate the final dataset for output.
+  Results <- 
+    data.table(
+      SimulationNumber = rep(rep(seq(1:nSims), each = 11), times = length(OwnStrategies)),
+      PlayerNumber = rep(rep(seq(1:11), times = nSims), times = length(OwnStrategies)),
+      Strategies = rep(NA, times = nSims*length(OwnStrategies)),
+      CumulativeIncomes = rep(NA, times = nSims*length(OwnStrategies)),
+      OwnStrategy = rep(OwnStrategies, each = nSims*11)
+    )
+  
+
+  
+  for (s in 1:length(OwnStrategies)) {
+    
+    Strategies <- c(OwnStrategies[s], GroupStrategies)
+  
+    for (n in 1:nSims) {
+    
+      lockdown <- c() # Create empty list for checking whether there is a lockdown.
+      patientZeroSwitch <- c(0) # Indicate that a new patient zero has been picked from the beginning.
+      nInfections <- c()
+      
+        #Populate a data table with the inputs
+        Incomes <- data.table(
+        Players = rep(c("Player1", "Player2",
+                    "Player3", "Player4",
+                    "Player5", "Player6",
+                    "Player7", "Player8",
+                    "Player9", "Player10",
+                    "Player11"), times = 21),
+        PlayerStrategy = Strategies,
+        Variable = c(rep(paste0("Round_", seq(1:20)), each = 11), rep("Cumulative_Earnings", 11)),
+        Income = 0)
+        
+        # Infect patient zero
+        Infections <- data.table(
+        Players = rep(c("Player1", "Player2",
+                    "Player3", "Player4",
+                    "Player5", "Player6",
+                    "Player7", "Player8",
+                    "Player9", "Player10",
+                    "Player11"), times = 20),
+        PlayerStrategy = Strategies,
+        SelfIsolation = 0,
+        RoundNumber = rep(seq(1:20), each = 11),
+        Infected = 0,
+        Infectiousness = 0)
+        
+        patientZero <- sample(Infections$Players, 1)
+        
+        Infections <- 
+          Infections %>% 
+          mutate(Infected = ifelse(Players == patientZero & RoundNumber == 1, 1, 
+                                   ifelse(Players != patientZero & RoundNumber == 1, 0, NA)))
+      
+      #============================================ Each round we determine the number of infections, lockdown, and income
+      
+      for (round in 1:nRounds) {
+        
+        nInfections <- 
+          append(nInfections, sum(Infections %>% filter(RoundNumber == round) %>% select(Infected)))
+        
+        
+        ##====================================== Determine whether the group is in lockdown
+        if (nInfections[round] < lockdownThreshold) { # If there are <6 infections:
+          
+          lockdown <- append(lockdown, 0) # Not lockdown
+          
+          if (round > 3) {
+            
+            if(nInfections[round - 1] == 1 & 
+               nInfections[round - 2] == 1 &
+               nInfections[round - 3] == 1 &
+               patientZeroSwitch[round-2] != 1 &
+               patientZeroSwitch[round-1] != 1 &
+               patientZeroSwitch[round] != 1) { # If there have been no new infections, nor any patient zero switches:
+              
+               #Infect a new person
+              patientZero <- sample(Infections$Players, 1)
+              Infections <- 
+                Infections %>% 
+                mutate(Infected = ifelse(Players == patientZero & RoundNumber == round, 1, 
+                                  ifelse(Players != patientZero & RoundNumber == round, 0, Infected))) # Appoint new infected person for after lockdown
+              patientZeroSwitch <- append(patientZeroSwitch, 1)
+              } else {
+            patientZeroSwitch <- append(patientZeroSwitch, 0)
+              }
+          } else {
+              patientZeroSwitch <- append(patientZeroSwitch, 0)
+            }
+        
+        } else if (nInfections[round] >= lockdownThreshold &
+                   lockdown[round - 1] != 1) { # If there are 6 infections, and the last round was not a lockdown round:
+          
+          lockdown <- append(lockdown, 1) # Then lockdown: first round.
+          
+            if (round < 20) {
+              Infections$Infected[(1+(round)*11):(11+(round)*11)] <- Infections$Infected[(1+(round-1)*11):(11+(round-1)*11)]
+              }
+          
+          patientZeroSwitch <- append(patientZeroSwitch, 0) # We'll indicate the switch at the end of the lockdown.
+        
+        } else if (lockdown[round - 1] == 1 & 
+                   lockdown[round - 2] == 0) { #If >6 the last round was a lockdown round, but the one before was not:
+          
+          lockdown <- append(lockdown, 1) # lockdown round 2
+    
+          
+          patientZero <- sample(Infections$Players, 1)
+          Infections <- 
+            Infections %>% 
+                mutate(Infected = ifelse(Players == patientZero & RoundNumber == round + 1, 1, 
+                                  ifelse(Players != patientZero & RoundNumber == round + 1, 0, Infected))) # Appoint new infected person for after lockdown
+          
+          patientZeroSwitch <- append(patientZeroSwitch, 0)
+          
+        
+        } else if (lockdown[round - 1] == 1 & 
+                   lockdown[round - 2] == 1) { #If we already had 2 lockdown rounds:
+          
+          lockdown <- append(lockdown, 0) # No longer in lockdown
+          patientZeroSwitch <- append(patientZeroSwitch, 1) # To indicate that we are playing with a new patient zero after lockdown.
+          
+          # Copy infections from previous rounds.
+          Infections$Infected[(1+(round-1)*11):(11+(round-1)*11)] <- Infections$Infected[(1+(round-2)*11):(11+(round-2)*11)]
+          
+        }
+        
+        ##======================================= Determine whether players are infected
+        
+        if (lockdown[round] == 0) { # If not in lockdown
+          
+          #Specify players' actions each round based on their strategy
+
+          
+          Infections$SelfIsolation[(1+(round-1)*11):(11+(round-1)*11)] <- 
+            ifelse(Infections$PlayerStrategy[(1+(round-1)*11):(11+(round-1)*11)] == "Unconditional Cooperator", 
+                               1, # Full protection because of full self-isolation
+            ifelse(Infections[(1+(round-1)*11):(11+(round-1)*11),2] == "Stringent Cooperator", 
+                                      .75,
+            ifelse(Infections[(1+(round-1)*11):(11+(round-1)*11),2] == "Moderate Cooperator", 
+                                             .5,
+            ifelse(Infections[(1+(round-1)*11):(11+(round-1)*11),2] == "Slight Cooperator", 
+                                                    .25,
+            ifelse(Infections[(1+(round-1)*11):(11+(round-1)*11),2] == "Defector", 
+                                                           0, 
+            ifelse(Infections$PlayerStrategy[(1+(round-1)*11):(11+(round-1)*11)] == "Infection Matcher", 
+                   ifelse(nInfections[round] == 1, 0.25,
+                                                                                                                                                               ifelse(nInfections[round] == 2, .5,
+                                                                                                                                                                      ifelse(nInfections[round] == 3, .5,
+                                                                                                                                                                             ifelse(nInfections[round] == 4, .75,
+                                                                                                                                                                                    ifelse(nInfections[round] >= 5, 1, 1))))), 
+             ifelse(Infections$PlayerStrategy[(1+(round-1)*11):(11+(round-1)*11)] == "Stringent to Abandonment", 
+                    ifelse(nInfections[round] == 1, .75, 
+                           ifelse(nInfections[round] == 2, .75, 
+                                  ifelse(nInfections[round] == 3, 0,
+                                         ifelse(nInfections[round] == 4, 0, 
+                                                ifelse(nInfections[round] >= 5, 0, 1))))), 
+                    NA)))))))
+        
+          # Insert chance of transmission for each action of infected people.
+          Infections$Infectiousness[(1+(round-1)*11):(11+(round-1)*11)] <-
+            ifelse(Infections$Infected[(1+(round-1)*11):(11+(round-1)*11)] == 1, 
+                             1-Infections$SelfIsolation[(1+(round-1)*11):(11+(round-1)*11)], 
+                             0) 
+          
+          # Set limit to transmission risk for other players
+          TransmissionPool <- 
+            ifelse(sum(Infections$Infectiousness[(1+(round-1)*11):(11+(round-1)*11)]) <= 1, 
+                                     sum(Infections$Infectiousness[(1+(round-1)*11):(11+(round-1)*11)]),
+                                     1)
+        if (round < 20) {
+            # Determine whether disease is transmitted
+            Infections$Infected[(1+(round)*11):(11+(round)*11)] <- # Determine infections for next round 
+              ifelse(Infections$Infected[(1+(round-1)*11):(11+(round-1)*11)] == 0, # If the person was not infected 
+                     rbinom(11, 1, (1 - Infections$SelfIsolation[(1+(round-1)*11):(11+(round-1)*11)]) * TransmissionPool), 
+                     #Infect with probability (1-SelfIsolation) * TransmissionPool, example: Slight self-isolation, TransmissionPool is 1, rbinom(1,1,.75)
+                     Infections$Infected[(1+(round-1)*11):(11+(round-1)*11)] # Else, preserve infection
+                     )
+        }
+          
+        } else if (lockdown[round] == 1) { # If in lockdown
+          
+          Infections$SelfIsolation[(1+(round-1)*11):(11+(round-1)*11)] <- 
+            rep(NA, 11)
+          
+          Infections$Infectiousness[(1+(round-1)*11):(11+(round-1)*11)] <-
+            rep(NA, 11)
+                      
+        }
+        
+        #=============================================== Set payoffs based on lockdown yes/no
+          
+          
+        # Insert incomes
+        Incomes$Income[(1+(round-1)*11):(11+(round-1)*11)] <-
+          ifelse(!is.na(Infections$SelfIsolation[(1+(round-1)*11):(11+(round-1)*11)]), 
+                 100 - 40 *Infections$SelfIsolation[(1+(round-1)*11):(11+(round-1)*11)],
+            LockdownIncome)
+          }
+      
+      # Set cumulative income for each player after finishing the game.
+      Incomes[Variable == "Cumulative_Earnings", 'Income'] <- 
+        Incomes[Variable != "Cumulative_Earnings", sum(Income), Players][, V1]
+      
+      Results$CumulativeIncomes[(((s-1)*nSims*11)+(1+(n-1)*11)):(((s-1)*nSims*11)+(11+(n-1)*11))] <- 
+        Incomes$Income[221:231]
+      Results$Strategies[(((s-1)*nSims*11)+(1+(n-1)*11)):(((s-1)*nSims*11)+(11+(n-1)*11))] <-
+        Incomes$PlayerStrategy[1:11]
+    }
+  }
+  # Push results to global environment
+  Results <<- Results
+  #returnList <- list(Incomes, Infections, nInfections)
+  #return(returnList)
+}
+
+
+```
+
+
+
+
+```{r Run the Game}
+
+# Example
+SelfIsolationGame(HighIncomeLockdown, OwnStrategies, c(rep("Defector", 10)))
+
+
+```
+
+
+
+
+```{r Cooperator to Defector plot}
+
+# Here I demonstrate how I made one of the figures. It's not very elegantly coded and it can take a while.
+CooperativeList <- c(rep("Unconditional Cooperator", 10))
+DefectorList <- c(rep("Defector", 10))
+
+SelfIsolationGame(HighIncomeLockdown, CooperativeList, 5)
+PlotData <- Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = 0)
+SelfIsolationGame(HighIncomeLockdown, c(rep("Defector", 1), rep("Unconditional Cooperator", 9)), 5)
+PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = 1))
+SelfIsolationGame(HighIncomeLockdown, c(rep("Defector", 2), rep("Unconditional Cooperator", 8)), 5)
+PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = 2))
+SelfIsolationGame(HighIncomeLockdown, c(rep("Defector", 3), rep("Unconditional Cooperator", 7)), 5)
+PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = 3))
+SelfIsolationGame(HighIncomeLockdown, c(rep("Defector", 4), rep("Unconditional Cooperator", 6)), 5)
+PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = 4))
+SelfIsolationGame(HighIncomeLockdown, c(rep("Defector", 5), rep("Unconditional Cooperator", 5)))
+PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = 5))
+SelfIsolationGame(HighIncomeLockdown, c(rep("Defector", 6), rep("Unconditional Cooperator", 4)))
+PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = 6))
+SelfIsolationGame(HighIncomeLockdown, c(rep("Defector", 7), rep("Unconditional Cooperator", 3)))
+PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = 7))
+SelfIsolationGame(HighIncomeLockdown, c(rep("Defector", 8), rep("Unconditional Cooperator", 2)))
+PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = 8))
+SelfIsolationGame(HighIncomeLockdown, c(rep("Defector", 9), rep("Unconditional Cooperator", 1)))
+PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = 9))
+SelfIsolationGame(HighIncomeLockdown, DefectorList)
+PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = 10))
+
+PlotDF <- PlotData %>% 
+  group_by(Number_of_Defectors, OwnStrategy) %>% 
+  filter(PlayerNumber == 1) %>%
+  summarise(CumulativeIncome = mean(CumulativeIncomes)) %>% 
+  ungroup() %>% 
+  mutate(OwnStrategy = factor(OwnStrategy, levels=c("Defector", "Slight Cooperator",
+                                                    "Infection Matcher", "Moderate Cooperator",
+                                                    "Stringent Cooperator", "Complete Cooperator",
+                                                    "Stringent to Abandonment")),
+         Number_of_Defectors = factor(Number_of_Defectors))
+
+ggplot(PlotDF, aes(x = Number_of_Defectors, y = CumulativeIncome, col = OwnStrategy, group = OwnStrategy)) +
+  geom_point() +
+  geom_line() + 
+  scale_color_viridis_d(begin = .2, end = .85) +
+  labs(title = "Low Cost of Lockdown", x = "Number of Defectors", 
+       y = "Income in points during game", col = "Own Strategy") +
+  lims(y = c(500, 2000)) +
+  theme_light() +
+  ggsave("ComplexStrategiesLowCost.png", width = 7, height = 5)
+
+
+```
+
+
+
