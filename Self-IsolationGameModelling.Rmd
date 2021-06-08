@@ -32,7 +32,7 @@ OwnStrategies <- c("Moderate to None",
 
 
 ```{r New version}
-SelfIsolationGame <- function(LockdownIncome, OwnStrategies, GroupStrategies, nSims = 250) {
+SelfIsolationGame <- function(LockdownIncome, OwnStrategies, GroupStrategies, nSims = 100) {
   nPlayers = 11
   lockdownThreshold = 6
   nRounds = 20
@@ -251,8 +251,6 @@ SelfIsolationGame <- function(LockdownIncome, OwnStrategies, GroupStrategies, nS
   #returnList <- list(Incomes, Infections, nInfections)
   return(Results)
 }
-
-
 ```
 
 
@@ -263,15 +261,17 @@ SelfIsolationGame <- function(LockdownIncome, OwnStrategies, GroupStrategies, nS
 
 set.seed(123)
 
-# Running for loop on the low cost lockdown scenarios
+# Running for loop on the low cost lockdown scenarios plots - many sims will take a long time, change simulations to 50 to get a reasonable estimate
 iter = 11
+simulations = 1000
 PlotData <- data.table() 
 for (i in 1:iter) {
   a <- Sys.time()
   Results <- SelfIsolationGame(HighIncomeLockdown, OwnStrategies,
-                    c(rep("Defector", (10-(i-1))), rep("Unconditional Cooperator", (i-1))))
+                    c(rep("Defector", (10-(i-1))), rep("Unconditional Cooperator", (i-1))),
+                    simulations)
   PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = (10-(i-1))))
-  cat(i," out of ", iter, " iterations complete.\n")
+  cat(i,"out of", iter, "iterations complete.\n")
   b <- Sys.time()
   print(b-a)
   
@@ -295,9 +295,10 @@ PlotData <- data.table()
 for (i in 1:iter) {
   a <- Sys.time()
   Results <- SelfIsolationGame(LowIncomeLockdown, OwnStrategies,
-                    c(rep("Defector", (10-(i-1))), rep("Unconditional Cooperator", (i-1))))
+                    c(rep("Defector", (10-(i-1))), rep("Unconditional Cooperator", (i-1))),
+                    simulations)
   PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = (10-(i-1))))
-  cat(i," out of ", iter, " iterations complete.\n")
+  cat(i,"out of", iter, "iterations complete.\n")
   b <- Sys.time()
   print(b-a)
   
@@ -314,10 +315,12 @@ PlotDFHighCost <- PlotData %>%
                                                     "Unconditional Cooperator")),
          Number_of_Defectors = factor(Number_of_Defectors))
 
-
+#make a sound when done
 beepr::beep()
-
 ```
+
+
+
 ```{r Plots}
 
 LowCostStaticStrategies <- 
@@ -327,8 +330,8 @@ LowCostStaticStrategies <-
   geom_point() +
   geom_line() + 
   scale_color_viridis_d(begin = .2, end = .85) +
-  labs(title = "Low Cost of Lockdown", x = "Number of Defectors", 
-       y = "Income in Points During Game", col = "Own Strategy") +
+  labs(title = "Low cost of lockdown", x = "Number of defectors", 
+       y = "Income in points during game", col = "Own strategy") +
   lims(y = c(500, 2000)) +
   theme_light() + 
   theme(plot.title = element_text(size = 12))
@@ -340,8 +343,8 @@ HighCostStaticStrategies <-
   geom_point() +
   geom_line() + 
   scale_color_viridis_d(begin = .2, end = .85) +
-  labs(title = "High Cost of Lockdown", x = "Number of Defectors", 
-       y = "Income in Points During Game", col = "Own Strategy") +
+  labs(title = "High cost of lockdown", x = "Number of defectors", 
+       y = "Income in points during game", col = "Own strategy") +
   lims(y = c(500, 2000)) +
   theme_light() + 
   theme(plot.title = element_text(size = 12))
@@ -358,8 +361,8 @@ LowCostDynamicStrategies <-
   geom_point() +
   geom_line() + 
   scale_color_viridis_d(begin = .2, end = .85) +
-  labs(title = "Low Cost of Lockdown", x = "Number of Defectors", 
-       y = "Income in points during game", col = "Own Strategy") +
+  labs(title = "Low cost of lockdown", x = "Number of defectors", 
+       y = "Income in points during game", col = "Own strategy") +
   lims(y = c(500, 2000)) +
   theme_light() + 
   theme(plot.title = element_text(size = 12))
@@ -369,8 +372,8 @@ HighCostDynamicStrategies <-
   geom_point() +
   geom_line() + 
   scale_color_viridis_d(begin = .2, end = .85) +
-  labs(title = "High Cost of Lockdown", x = "Number of Defectors", 
-       y = "Income in points during game", col = "Own Strategy") +
+  labs(title = "High cost of lockdown", x = "Number of defectors", 
+       y = "Income in points during game", col = "Own strategy") +
   lims(y = c(500, 2000)) +
   theme_light() + 
   theme(plot.title = element_text(size = 12))

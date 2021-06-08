@@ -178,7 +178,7 @@ H5Data <-
 ```
 
 
-```{r Visualisation Experiment 1}
+```{r Visualisation}
 
 #====================================================================== H1
 
@@ -321,6 +321,32 @@ InfectionsLockdownPlot <-
        col = 'Cost of Lockdown') +
   scale_colour_viridis_d(begin = .8, end = .1) +
   theme_light()
+
+
+#====================================================================== Self-isolation levels per round.
+
+ggplot(H1Data %>%
+         group_by(subsession.round_number, Order, group.lockdown_cost) %>%
+         summarise(selfIsolation = mean(player.contribution, na.rm = T)) %>%
+         mutate(CostOfLockdown = factor(group.lockdown_cost)),
+  aes(x = subsession.round_number, y = selfIsolation, 
+      col = Order, shape = CostOfLockdown)) +
+  geom_point(size = 1.4) +
+  lims(y = c(0, 40)) +
+  scale_y_continuous(breaks = c(0, 10, 20, 30, 40), 
+                     labels = c('None', 
+                                'Slight' , 
+                                'Moderate', 
+                                'Stringent', 
+                                'Complete'), 
+                     minor_breaks = c(5, 15, 25, 35),
+                     limits = c(0, 40),
+                     sec.axis = sec_axis(trans=~.*1)) +
+  labs(x = "Round number", y = "Incentivised self-isolation", 
+       shape = "Cost of lockdown") +
+  scale_color_viridis_d(begin = .3, end = .7) +
+  theme_light() +
+  ggsave("SelfIsolationByRoundPlot.png", height = 5, width = 7)
 
 
 ```
@@ -623,338 +649,3 @@ IncentivisedPredictionData %>%
 
 
 ```
-
-
-
-## Pilot materials
-
-```{r Pilot Analysis, eval = FALSE}
-
-PilotLmmContribution <-
-  mixed(player.contribution ~
-          subsession.round_number +
-          group.total_infections +
-          factor(player.my_endowment) +
-          (subsession.round_number|session.code/participant.code),
-        data = publicGoodsData)
-nice(lmmContribution)
-
-
-
-```
-
-
-
-```{r Figures for visualisation, eval = FALSE}
-ggplot(publicGoodsData, aes(x = player.contribution, 
-                            fill = group.condition)) +
-  geom_density(alpha = .4) +
-  labs(x = 'Contribution', y = 'Density')
-
-ggplot(publicGoodsData %>% filter(player.my_endowment != 160 & player.my_endowment != 240) %>% mutate(Endowment = factor(player.my_endowment)),
-       aes(x = player.contribution,
-           fill = Endowment)) +
-  geom_density(alpha = .4) +
-  labs(x = 'Contribution', y = 'Density')
-
-
-
-ggplot(publicGoodsData %>%
-         group_by(subsession.round_number) %>%
-         summarise(lockdown = mean(group.lockdown)),
-       aes(x = subsession.round_number, y = lockdown)) +
-  geom_point()
-
-ggplot(publicGoodsData %>% 
-         filter(group.total_infections < 6) %>%
-         mutate(Infections = factor(group.total_infections),
-                Contribution = player.contribution),
-       aes(x = Infections,
-           y = Contribution,
-           fill = Infections)) +
-  geom_violin() +
-  scale_fill_viridis_d(end = .9) +
-  theme_light()
-
-#============================== C-game: Self-isolation by cases in group
-
-ggplot(publicGoodsData %>%
-         filter(group.total_infections < 6, player.second_player_contribution_0 != 5) %>%
-         mutate(`Cases in group` = as.numeric(group.total_infections)) %>%
-         group_by(`Cases in group`) %>%
-         summarise(`Self-isolation` = mean(player.contribution, na.rm = T),
-                   lowerCi = `Self-isolation` - 1.96*sd(player.contribution, na.rm = T)/sqrt(n()),
-                   upperCi = `Self-isolation` + 1.96*sd(player.contribution, na.rm = T)/sqrt(n())),
-       aes(x = `Cases in group`, y = `Self-isolation`)) +
-  geom_point() +
-  geom_line() +
-  geom_errorbar(aes(ymin = lowerCi, ymax = upperCi), width = .1) +
-  labs(title = 'Incentivised self-isolation by number of infections',
-       x = 'Number of infections in group',
-       y = 'Incentivised self-isolation') +
-  scale_y_continuous(breaks = c(0, 1, 2, 3, 4), 
-                     labels = c('None (0)', 
-                                'Slight (1)' , 
-                                'Moderate (2)', 
-                                'Stringent (3)', 
-                                'Complete (4)'), 
-                     minor_breaks = c(.5, 1.5, 2.5, 3.5),
-                     limits = c(0,4)) +
-  theme_light()
-
-ggplot(publicGoodsData %>%
-         filter(player.second_player_contribution_0 != 5) %>% 
-         group_by(session.code, subsession.round_number) %>%
-         summarise(`Self-isolation` = mean(player.contribution)) %>%
-         ungroup() %>%
-         arrange(subsession.round_number) %>% 
-         mutate(`Average self-isolation in previous round` = ),
-       aes(x = `Self-isolation`,
-           y = `Average self-isolation in previous round`)) +
-  geom_point()
-
-#============================= round number stuff
-ggplot(publicGoodsData %>% 
-         group_by(subsession.round_number) %>%
-         summarise(`Self-isolation` = mean(player.contribution, na.rm = T)) %>%
-         rename(`Round Number` = subsession.round_number), 
-       aes(x = `Round Number`,
-           y = `Self-isolation`)) +
-  geom_point() +
-  geom_smooth() +
-  scale_y_continuous(breaks = c(0, 1, 2, 3, 4), 
-                     labels = c('None (0)', 
-                                'Slight (1)' , 
-                                'Moderate (2)', 
-                                'Stringent (3)', 
-                                'Complete (4)'), 
-                     minor_breaks = c(.5, 1.5, 2.5, 3.5),
-                     limits = c(0,4)) +
-  theme_light() +
-  theme(axis.text = element_text(size = 7))
-
-# ggplot(publicGoodsData %>% 
-#          group_by(subsession.round_number, group.condition) %>%
-#          summarise(player.contribution = mean(player.contribution, na.rm = T)), 
-#        aes(x = subsession.round_number,
-#            y = player.contribution,
-#            colour = group.condition)) +
-#   geom_point() +
-#   geom_smooth() +
-#   lims(y = c(0,4)) +
-#   theme_light()
-
-
-
-```
-
-
-```{r P Game figures, eval = FALSE}
-
-pGameOthers #  <-
-  ggplot(publicGoodsData %>% 
-         filter(player.second_player_contribution_0 != 5) %>% 
-         summarise(SecondPlayer0 = mean(player.second_player_contribution_0, na.rm = T),
-                              lowerciSecondPlayer0 = SecondPlayer0 - 1.96*(sd(player.second_player_contribution_0, na.rm = T)/sqrt(n())),
-                              upperciSecondPlayer0 = SecondPlayer0 + 1.96*(sd(player.second_player_contribution_0, na.rm = T)/sqrt(n())),
-                              SecondPlayer1 = mean(player.second_player_contribution_1, na.rm = T),
-                              lowerciSecondPlayer1 = SecondPlayer1 - 1.96*(sd(player.second_player_contribution_1, na.rm = T)/sqrt(n())),
-                              upperciSecondPlayer1 = SecondPlayer1 + 1.96*(sd(player.second_player_contribution_1, na.rm = T)/sqrt(n())),
-                              SecondPlayer2 = mean(player.second_player_contribution_2, na.rm = T),
-                              lowerciSecondPlayer2 = SecondPlayer2 - 1.96*(sd(player.second_player_contribution_2, na.rm = T)/sqrt(n())),
-                              upperciSecondPlayer2 = SecondPlayer2 + 1.96*(sd(player.second_player_contribution_2, na.rm = T)/sqrt(n())),
-                              SecondPlayer3 = mean(player.second_player_contribution_3, na.rm = T),
-                              lowerciSecondPlayer3 = SecondPlayer3 - 1.96*(sd(player.second_player_contribution_3, na.rm = T)/sqrt(n())),
-                              upperciSecondPlayer3 = SecondPlayer3 + 1.96*(sd(player.second_player_contribution_3, na.rm = T)/sqrt(n())),
-                              SecondPlayer4 = mean(player.second_player_contribution_4, na.rm = T),
-                              lowerciSecondPlayer4 = SecondPlayer4 - 1.96*(sd(player.second_player_contribution_4, na.rm = T)/sqrt(n())),
-                              upperciSecondPlayer4 = SecondPlayer4 + 1.96*(sd(player.second_player_contribution_4, na.rm = T)/sqrt(n()))) %>%
-  pivot_longer(cols = everything(), names_to = c('Conditional'), values_to = c('Values')) %>%
-  mutate(number = rep(c(0,1,2,3,4), each = 3),
-         Conditional = rep(c("Contribution", "lowerCi", "upperCi"), times = 5)) %>%
-  pivot_wider(id = 'number', names_from = 'Conditional', values_from = 'Values') %>%
-  rename(`Others' self-isolation` = number,
-         `Self-isolation` = Contribution),
-  aes(x = `Others' self-isolation`, 
-      y = `Self-isolation`)) +
-  geom_point() +
-  geom_line() +
-  geom_errorbar(aes(ymin=lowerCi, ymax=upperCi), colour="black", width=.1) +
-  scale_x_continuous(breaks = c(0, 1, 2, 3, 4), labels = c('None (0)', 'Slight (1)', 'Moderate (2)', 'Stringent (3)', 'Complete (4)')) +
-  scale_y_continuous(breaks = c(0, 1, 2, 3, 4), 
-                     labels = c('None (0)', 
-                                'Slight (1)' , 
-                                'Moderate (2)', 
-                                'Stringent (3)', 
-                                'Complete (4)'), 
-                     minor_breaks = c(.5, 1.5, 2.5, 3.5),
-                     limits = c(0,4)) +
-  labs(title = 'Hypothetical self-isolation conditional on average contribution in group',
-       y = 'Hypothetical self-isolation',
-       x = 'Assumed self-isolation of others') +
-  theme_light() +
-  theme(axis.text = element_text(size = 7))
-
-pGameInfections <- 
-  ggplot(publicGoodsData %>%
-         filter(player.second_player_contribution_0 != 5) %>%
-         group_by(group.total_infections) %>%
-         summarise(`Self-isolation` = mean(c(player.second_player_contribution_0,
-                                         player.second_player_contribution_1,
-                                         player.second_player_contribution_2,
-                                         player.second_player_contribution_3,
-                                         player.second_player_contribution_4)),
-                   lowerCi = `Self-isolation` -
-                     1.96*sd(c(player.second_player_contribution_0,
-                                         player.second_player_contribution_1,
-                                         player.second_player_contribution_2,
-                                         player.second_player_contribution_3,
-                                         player.second_player_contribution_4))/sqrt(n()*5), #multiply n by five as averaging over 5 cols
-                   upperCi = `Self-isolation` +
-                     1.96*sd(c(player.second_player_contribution_0,
-                                         player.second_player_contribution_1,
-                                         player.second_player_contribution_2,
-                                         player.second_player_contribution_3,
-                                         player.second_player_contribution_4))/sqrt(n()*5)) %>%
-         rename(`Number of cases in group` = group.total_infections),
-       aes(x = `Number of cases in group`, y = `Self-isolation`)) +
-  geom_point() +
-  geom_line() +
-  #geom_ribbon(aes(ymin = lowerCi, ymax = upperCi), alpha = .1) +
-  geom_errorbar(aes(ymin=lowerCi, ymax=upperCi), colour="black", width=.1) +
-  labs(title = 'Hypothetical self-isolation by number of cases in group', y = ' ') +
-  theme_light() +
-  scale_y_continuous(breaks = c(0, 1, 2, 3, 4), 
-                     labels = NULL, 
-                     minor_breaks = c(.5, 1.5, 2.5, 3.5),
-                     limits = c(0,4)) +
-  theme(axis.text = element_text(size = 7))
-
-ggarrange(pGameOthers, pGameInfections) +
-  ggsave("pGamePlots.png", width = 12, height = 5)
-
-
-
-
-```
-
-
-```{r second player comparison, eval = FALSE}
-
-a <- ggplot(publicGoodsData %>% filter(!is.na(player.second_player_contribution_0)), 
-       (aes(x = factor(player.second_player_contribution_0), y = player.contribution, col = group.total_infections))) +
-  geom_jitter(height = .3, width = .3) +
-  scale_colour_viridis_c(begin = 0, end = .85) +
-  labs(x = 'Response if Second Player Contribution = No Self-Isolation', 
-       y = 'Actual Response',
-       col = 'Number of infections') +
-  theme_light()
-b <- ggplot(publicGoodsData %>% filter(!is.na(player.second_player_contribution_1)), 
-       (aes(x = factor(player.second_player_contribution_1), y = player.contribution, col = group.total_infections))) +
-  geom_jitter(height = .3, width = .3) +
-  scale_colour_viridis_c(begin = 0, end = .85) +
-  labs(x = 'Response if Second Player Contribution = Slight Self-Isolation', 
-       y = 'Actual Response',
-       col = 'Number of infections') +
-  theme_light()
-c <- ggplot(publicGoodsData %>% filter(!is.na(player.second_player_contribution_2)), 
-       (aes(x = factor(player.second_player_contribution_2), y = player.contribution, col = group.total_infections))) +
-  geom_jitter(height = .3, width = .3) +
-  scale_colour_viridis_c(begin = 0, end = .85) +
-  labs(x = 'Response if Second Player Contribution = Moderate Self-Isolation', 
-       y = 'Actual Response',
-       col = 'Number of infections') +
-  theme_light()
-d <- ggplot(publicGoodsData %>% filter(!is.na(player.second_player_contribution_3)), 
-       (aes(x = factor(player.second_player_contribution_3), y = player.contribution, col = group.total_infections))) +
-  geom_jitter(height = .3, width = .3) +
-  scale_colour_viridis_c(begin = 0, end = .85) +
-  labs(x = 'Response if Second Player Contribution = Stringent Self-Isolation', 
-       y = 'Actual Response',
-       col = 'Number of infections') +
-  theme_light()
-e <- ggplot(publicGoodsData %>% filter(!is.na(player.second_player_contribution_4)), 
-       (aes(x = factor(player.second_player_contribution_4), y = player.contribution, col = group.total_infections))) +
-  geom_jitter(height = .3, width = .3) +
-  scale_colour_viridis_c(begin = 0, end = .85) +
-  labs(x = 'Response if Second Player Contribution = Complete Self-Isolation', 
-       y = 'Actual Response',
-       col = 'Number of infections') +
-  theme_light()
-
-ggarrange(a, b, c, d, e) +
-  ggsave('SecondPlayerPlots.png', width = 18, height = 8)
-  
-
-
-```
-
-
-
-
-```{r Descriptives, eval = FALSE}
-
-View(publicGoodsData %>% filter(group.total_infections < 6) %>% group_by(group.condition, group.total_infections) %>% summarise(lockdown = mean(player.contribution, na.rm = T)))
-
-publicGoodsData %>% 
-  filter(group.total_infections < 6) %>% 
-  group_by(group.total_infections) %>% 
-  summarise(`Second Player Contribution - None` = mean(player.second_player_contribution_0, na.rm = T),
-            `Second Player Contribution - Slight` = mean(player.second_player_contribution_1, na.rm = T),
-            `Second Player Contribution - Moderate` = mean(player.second_player_contribution_2, na.rm = T),
-            `Second Player Contribution - Stringent` = mean(player.second_player_contribution_3, na.rm = T),
-            `Second Player Contribution - Complete` = mean(player.second_player_contribution_4, na.rm = T))
-
-```
-
-
-```{r Role splitting, eval = FALSE}
-
-rolesData <- 
-  publicGoodsData %>%
-  group_by(participant.code, subsession.round_number) %>%
-  summarise(secondPlayer0 = mean(player.second_player_contribution_0, na.rm = T),
-            secondPlayer1 = mean(player.second_player_contribution_1, na.rm = T),
-            secondPlayer2 = mean(player.second_player_contribution_2, na.rm = T),
-            secondPlayer3 = mean(player.second_player_contribution_3, na.rm = T),
-            secondPlayer4 = mean(player.second_player_contribution_4, na.rm = T)) %>%
-  pivot_longer(cols = secondPlayer0:secondPlayer4,
-               names_to = "Self-isolation of others",
-               values_to = "Self-isolation") %>%
-  mutate(`Self-isolation of others` = rep(c(0,1,2,3,4), times = 20))
-
-
-nested <- rolesData %>% 
-  nest(data = -participant.code)
-
-nested <- 
-  nested %>% 
-  mutate(
-    test = map(data, ~ cor.test(.x$`Self-isolation of others`, .x$`Self-isolation`, method = 'spearman')), # S3 list-col
-    tidied = map(test, tidy)
-  )  %>%
-  unnest(tidied) %>%
-  filter(estimate > 0, p.value < .05)
-
-#rolesData %>% group_by(participant.code) %>% summarise(selfIso = mean(`Self-isolation`, na.rm = T)) %>% filter(selfIso == 0)
-# no participant is a strict free rider
-#publicGoodsData %>% group_by(participant.code) %>% summarise(selfIso = mean(player.contribution, na.rm = T)) %>% filter(selfIso == 0)
-# neither in the c-game
-
-triangleContributorData <- 
-  rolesData %>%
-  group_by(participant.code, `Self-isolation of others`) %>%
-  summarise(`Self-isolation` = mean(`Self-isolation`, na.rm = T)) %>%
-  pivot_wider(id_cols = participant.code,
-              names_from = "Self-isolation of others",
-              names_prefix = "Others",
-              values_from = "Self-isolation") %>%
-  mutate(triangleContributor = ifelse(Others3 > Others4 & Others3 > Others2 & Others3 > Others1 & Others3 > Others0, T,
-                                      ifelse(Others2 > Others0 & Others2 > Others1 & Others2 > Others3 & Others2 > Others4, T, 
-                                             ifelse(Others1 > Others0 & Others1 > Others2 & Others1 > Others3 & Others1 > Others4, T, F)))) %>%
-  filter(triangleContributor == T)
-
-
-
-```
-
