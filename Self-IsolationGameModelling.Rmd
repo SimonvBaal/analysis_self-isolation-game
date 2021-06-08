@@ -8,6 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(data.table)
+library(ggpubr)
 
 ```
 
@@ -288,17 +289,6 @@ PlotDFLowCost <- PlotData %>%
                                                     "Unconditional Cooperator")),
          Number_of_Defectors = factor(Number_of_Defectors))
 
-ggplot(PlotDFLowCost %>% filter(!OwnStrategy %in% c("Slight Cooperator", "Stringent Cooperator")), aes(x = Number_of_Defectors, y = CumulativeIncome, col = OwnStrategy, group = OwnStrategy)) +
-  geom_point() +
-  geom_line() + 
-  scale_color_viridis_d(begin = .2, end = .85) +
-  labs(title = "Low Cost of Lockdown", x = "Number of Defectors", 
-       y = "Income in points during game", col = "Own Strategy") +
-  lims(y = c(500, 2000)) +
-  theme_light()
-#  ggsave("ComplexStrategiesLowCost.png", width = 7, height = 5)
-  
-  
   
 # Running for loop on the high cost scenarios
 PlotData <- data.table() 
@@ -324,17 +314,68 @@ PlotDFHighCost <- PlotData %>%
                                                     "Unconditional Cooperator")),
          Number_of_Defectors = factor(Number_of_Defectors))
 
-ggplot(PlotDFHighCost %>% filter(!OwnStrategy %in% c("Slight Cooperator", "Stringent Cooperator")), aes(x = Number_of_Defectors, y = CumulativeIncome, col = OwnStrategy, group = OwnStrategy)) +
+
+beepr::beep()
+
+```
+```{r Plots}
+
+LowCostStaticStrategies <- 
+  ggplot(PlotDFLowCost %>% 
+           filter(!OwnStrategy %in% c("Moderate to Complete", "Moderate to None")), 
+         aes(x = Number_of_Defectors, y = CumulativeIncome, col = OwnStrategy, group = OwnStrategy)) +
+  geom_point() +
+  geom_line() + 
+  scale_color_viridis_d(begin = .2, end = .85) +
+  labs(title = "Low Cost of Lockdown", x = "Number of Defectors", 
+       y = "Income in Points During Game", col = "Own Strategy") +
+  lims(y = c(500, 2000)) +
+  theme_light() + 
+  theme(plot.title = element_text(size = 12))
+
+HighCostStaticStrategies <- 
+  ggplot(PlotDFHighCost %>% 
+           filter(!OwnStrategy %in% c("Moderate to Complete", "Moderate to None")), 
+         aes(x = Number_of_Defectors, y = CumulativeIncome, col = OwnStrategy, group = OwnStrategy)) +
+  geom_point() +
+  geom_line() + 
+  scale_color_viridis_d(begin = .2, end = .85) +
+  labs(title = "High Cost of Lockdown", x = "Number of Defectors", 
+       y = "Income in Points During Game", col = "Own Strategy") +
+  lims(y = c(500, 2000)) +
+  theme_light() + 
+  theme(plot.title = element_text(size = 12))
+
+
+ggarrange(LowCostStaticStrategies, HighCostStaticStrategies, common.legend = T, legend = "bottom") +
+  ggsave("StaticStrategiesPlot.png", height = 4, width = 9, dpi = "print")
+
+
+LowCostDynamicStrategies <- 
+  ggplot(PlotDFLowCost %>% 
+           filter(!OwnStrategy %in% c("Slight Cooperator", "Stringent Cooperator")), 
+         aes(x = Number_of_Defectors, y = CumulativeIncome, col = OwnStrategy, group = OwnStrategy)) +
+  geom_point() +
+  geom_line() + 
+  scale_color_viridis_d(begin = .2, end = .85) +
+  labs(title = "Low Cost of Lockdown", x = "Number of Defectors", 
+       y = "Income in points during game", col = "Own Strategy") +
+  lims(y = c(500, 2000)) +
+  theme_light() + 
+  theme(plot.title = element_text(size = 12))
+
+HighCostDynamicStrategies <- 
+  ggplot(PlotDFHighCost %>% filter(!OwnStrategy %in% c("Slight Cooperator", "Stringent Cooperator")), aes(x = Number_of_Defectors, y = CumulativeIncome, col = OwnStrategy, group = OwnStrategy)) +
   geom_point() +
   geom_line() + 
   scale_color_viridis_d(begin = .2, end = .85) +
   labs(title = "High Cost of Lockdown", x = "Number of Defectors", 
        y = "Income in points during game", col = "Own Strategy") +
   lims(y = c(500, 2000)) +
-  theme_light()
-#  ggsave("ComplexStrategiesHighCost.png", width = 7, height = 5)
+  theme_light() + 
+  theme(plot.title = element_text(size = 12))
 
-beepr::beep()
+ggarrange(LowCostDynamicStrategies, HighCostDynamicStrategies, common.legend = T, legend = "bottom") +
+  ggsave("DynamicStrategiesPlot.png", height = 4, width = 9, dpi = "print")
 
 ```
-
