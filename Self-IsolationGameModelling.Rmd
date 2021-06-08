@@ -18,8 +18,8 @@ HighIncomeLockdown = 40
 LowIncomeLockdown = 10
 
 # Possible strategies given here:
-OwnStrategies <- c("Stringent to Abandonment",
-    "Infection Matcher",
+OwnStrategies <- c("Moderate to None",
+    "Moderate to Complete",
     "Unconditional Cooperator",
     "Stringent Cooperator",
     "Moderate Cooperator",
@@ -31,11 +31,9 @@ OwnStrategies <- c("Stringent to Abandonment",
 
 
 ```{r New version}
-SelfIsolationGame <- function(LockdownIncome, OwnStrategies, GroupStrategies, nSims = 250) {
-  set.seed(123)
+SelfIsolationGame <- function(LockdownIncome, OwnStrategies, GroupStrategies, nSims = 100) {
   nPlayers = 11
   lockdownThreshold = 6
-  round = 1
   nRounds = 20
   
 # Populate the final dataset for output.
@@ -48,7 +46,6 @@ SelfIsolationGame <- function(LockdownIncome, OwnStrategies, GroupStrategies, nS
       OwnStrategy = rep(OwnStrategies, each = nSims*11)
     )
   
-
   
   for (s in 1:length(OwnStrategies)) {
     
@@ -184,15 +181,15 @@ SelfIsolationGame <- function(LockdownIncome, OwnStrategies, GroupStrategies, nS
                                                     .25,
             ifelse(Infections[(1+(round-1)*11):(11+(round-1)*11),2] == "Defector", 
                                                            0, 
-            ifelse(Infections$PlayerStrategy[(1+(round-1)*11):(11+(round-1)*11)] == "Infection Matcher", 
-                   ifelse(nInfections[round] == 1, 0.25,
+            ifelse(Infections$PlayerStrategy[(1+(round-1)*11):(11+(round-1)*11)] == "Moderate to Complete", 
+                   ifelse(nInfections[round] == 1, .5,
                                                                                                                                                                ifelse(nInfections[round] == 2, .5,
-                                                                                                                                                                      ifelse(nInfections[round] == 3, .5,
-                                                                                                                                                                             ifelse(nInfections[round] == 4, .75,
+                                                                                                                                                                      ifelse(nInfections[round] == 3, 1,
+                                                                                                                                                                             ifelse(nInfections[round] == 4, 1,
                                                                                                                                                                                     ifelse(nInfections[round] >= 5, 1, 1))))), 
-             ifelse(Infections$PlayerStrategy[(1+(round-1)*11):(11+(round-1)*11)] == "Stringent to Abandonment", 
-                    ifelse(nInfections[round] == 1, .75, 
-                           ifelse(nInfections[round] == 2, .75, 
+             ifelse(Infections$PlayerStrategy[(1+(round-1)*11):(11+(round-1)*11)] == "Moderate to None", 
+                    ifelse(nInfections[round] == 1, .5, 
+                           ifelse(nInfections[round] == 2, .5, 
                                   ifelse(nInfections[round] == 3, 0,
                                          ifelse(nInfections[round] == 4, 0, 
                                                 ifelse(nInfections[round] >= 5, 0, 1))))), 
@@ -250,80 +247,95 @@ SelfIsolationGame <- function(LockdownIncome, OwnStrategies, GroupStrategies, nS
     }
   }
   # Push results to global environment
-  Results <<- Results
   #returnList <- list(Incomes, Infections, nInfections)
-  #return(returnList)
+  return(Results)
 }
 
 
 ```
 
 
-
-
 ```{r Run the Game}
 
 # Example
-SelfIsolationGame(HighIncomeLockdown, OwnStrategies, c(rep("Defector", 10)))
+#SelfIsolationGame(HighIncomeLockdown, OwnStrategies, c(rep("Defector", 10)))
+
+set.seed(123)
+
+# Running for loop on the low cost lockdown scenarios
+iter = 11
+PlotData <- data.table() 
+for (i in 1:iter) {
+  a <- Sys.time()
+  Results <- SelfIsolationGame(HighIncomeLockdown, OwnStrategies,
+                    c(rep("Defector", (10-(i-1))), rep("Unconditional Cooperator", (i-1))))
+  PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = (10-(i-1))))
+  cat(i," out of ", iter, " iterations complete.\n")
+  b <- Sys.time()
+  print(b-a)
+  
+}
 
 
-```
-
-
-
-
-```{r Cooperator to Defector plot}
-
-# Here I demonstrate how I made one of the figures. It's not very elegantly coded and it can take a while.
-CooperativeList <- c(rep("Unconditional Cooperator", 10))
-DefectorList <- c(rep("Defector", 10))
-
-SelfIsolationGame(HighIncomeLockdown, CooperativeList, 5)
-PlotData <- Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = 0)
-SelfIsolationGame(HighIncomeLockdown, c(rep("Defector", 1), rep("Unconditional Cooperator", 9)), 5)
-PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = 1))
-SelfIsolationGame(HighIncomeLockdown, c(rep("Defector", 2), rep("Unconditional Cooperator", 8)), 5)
-PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = 2))
-SelfIsolationGame(HighIncomeLockdown, c(rep("Defector", 3), rep("Unconditional Cooperator", 7)), 5)
-PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = 3))
-SelfIsolationGame(HighIncomeLockdown, c(rep("Defector", 4), rep("Unconditional Cooperator", 6)), 5)
-PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = 4))
-SelfIsolationGame(HighIncomeLockdown, c(rep("Defector", 5), rep("Unconditional Cooperator", 5)))
-PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = 5))
-SelfIsolationGame(HighIncomeLockdown, c(rep("Defector", 6), rep("Unconditional Cooperator", 4)))
-PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = 6))
-SelfIsolationGame(HighIncomeLockdown, c(rep("Defector", 7), rep("Unconditional Cooperator", 3)))
-PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = 7))
-SelfIsolationGame(HighIncomeLockdown, c(rep("Defector", 8), rep("Unconditional Cooperator", 2)))
-PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = 8))
-SelfIsolationGame(HighIncomeLockdown, c(rep("Defector", 9), rep("Unconditional Cooperator", 1)))
-PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = 9))
-SelfIsolationGame(HighIncomeLockdown, DefectorList)
-PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = 10))
-
-PlotDF <- PlotData %>% 
+PlotDFLowCost <- PlotData %>% 
   group_by(Number_of_Defectors, OwnStrategy) %>% 
   filter(PlayerNumber == 1) %>%
   summarise(CumulativeIncome = mean(CumulativeIncomes)) %>% 
   ungroup() %>% 
   mutate(OwnStrategy = factor(OwnStrategy, levels=c("Defector", "Slight Cooperator",
-                                                    "Infection Matcher", "Moderate Cooperator",
-                                                    "Stringent Cooperator", "Complete Cooperator",
-                                                    "Stringent to Abandonment")),
+                                                    "Moderate to None", "Moderate Cooperator", 
+                                                    "Moderate to Complete", "Stringent Cooperator", 
+                                                    "Unconditional Cooperator")),
          Number_of_Defectors = factor(Number_of_Defectors))
 
-ggplot(PlotDF, aes(x = Number_of_Defectors, y = CumulativeIncome, col = OwnStrategy, group = OwnStrategy)) +
+ggplot(PlotDFLowCost %>% filter(!OwnStrategy %in% c("Slight Cooperator", "Stringent Cooperator")), aes(x = Number_of_Defectors, y = CumulativeIncome, col = OwnStrategy, group = OwnStrategy)) +
   geom_point() +
   geom_line() + 
   scale_color_viridis_d(begin = .2, end = .85) +
   labs(title = "Low Cost of Lockdown", x = "Number of Defectors", 
        y = "Income in points during game", col = "Own Strategy") +
   lims(y = c(500, 2000)) +
-  theme_light() +
+  theme_light()
   ggsave("ComplexStrategiesLowCost.png", width = 7, height = 5)
+  
+  
+  
+# Running for loop on the high cost scenarios
+PlotData <- data.table() 
+for (i in 1:iter) {
+  a <- Sys.time()
+  Results <- SelfIsolationGame(LowIncomeLockdown, OwnStrategies,
+                    c(rep("Defector", (10-(i-1))), rep("Unconditional Cooperator", (i-1))))
+  PlotData <- rbind(PlotData, Results %>% filter(PlayerNumber == 1) %>% mutate(Number_of_Defectors = (10-(i-1))))
+  cat(i," out of ", iter, " iterations complete.\n")
+  b <- Sys.time()
+  print(b-a)
+  
+}
 
+
+PlotDFHighCost <- PlotData %>% 
+  group_by(Number_of_Defectors, OwnStrategy) %>% 
+  filter(PlayerNumber == 1) %>%
+  summarise(CumulativeIncome = mean(CumulativeIncomes)) %>% 
+  ungroup() %>% 
+  mutate(OwnStrategy = factor(OwnStrategy, levels=c("Defector", "Slight Cooperator",
+                                                    "Moderate to None", "Moderate Cooperator", 
+                                                    "Moderate to Complete", "Stringent Cooperator", 
+                                                    "Unconditional Cooperator")),
+         Number_of_Defectors = factor(Number_of_Defectors))
+
+ggplot(PlotDFHighCost %>% filter(!OwnStrategy %in% c("Slight Cooperator", "Stringent Cooperator")), aes(x = Number_of_Defectors, y = CumulativeIncome, col = OwnStrategy, group = OwnStrategy)) +
+  geom_point() +
+  geom_line() + 
+  scale_color_viridis_d(begin = .2, end = .85) +
+  labs(title = "High Cost of Lockdown", x = "Number of Defectors", 
+       y = "Income in points during game", col = "Own Strategy") +
+  lims(y = c(500, 2000)) +
+  theme_light()
+  ggsave("ComplexStrategiesHighCost.png", width = 7, height = 5)
+
+beepr::beep()
 
 ```
-
-
 

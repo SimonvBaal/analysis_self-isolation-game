@@ -1,0 +1,55 @@
+---
+title: "ReplicatorDynamics"
+author: "Simon van Baal"
+date: "13/05/2021"
+output: html_document
+---
+
+```{r setup}
+library(tidyverse)
+library(EvolutionaryGames)
+
+```
+
+
+```{r}
+# example
+
+ESS(matrix(c(-1, 4, 0, 2), 2, byrow=TRUE), c("Hawk", "Dove"))
+ESS(matrix(c(-1, 4, 0, 2), 2, byrow=TRUE), c("Hawk", "Dove"), FALSE)
+
+matrix(c(-1, 4, 0, 2), 2, byrow=TRUE)
+
+```
+
+```{r Replicator Function}
+
+Replicator <- function(time, state, parameters) {
+  a <- parameters
+  states <- sqrt(length(a))
+  A <- matrix(a, states, byrow = TRUE)
+  A <- t(A)
+
+  dX <- c()
+
+  for(i in 1:states) {
+    dX[i] <- sum(state * A[i, ])
+  }
+
+  avgFitness <- sum(dX * state)
+
+  for(i in 1:states) {
+    dX[i] <- state[i] * (dX[i] - avgFitness)
+  }
+
+  return(list(dX))
+}
+
+
+A <- matrix(c(5, -9, 6, 8, 20, 1, 2, -18, -14, 0, 2, 20, 13, 0, 4, -13),
+ 4, 4, byrow=TRUE)
+state <- c(0.3, 0.2, 0.1, 0.4)
+phaseDiagram4S(A, Replicator, NULL, state, noRGL = FALSE)
+
+
+```
