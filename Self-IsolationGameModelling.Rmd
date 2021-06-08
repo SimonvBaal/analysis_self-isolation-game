@@ -31,7 +31,7 @@ OwnStrategies <- c("Moderate to None",
 
 
 ```{r New version}
-SelfIsolationGame <- function(LockdownIncome, OwnStrategies, GroupStrategies, nSims = 100) {
+SelfIsolationGame <- function(LockdownIncome, OwnStrategies, GroupStrategies, nSims = 250) {
   nPlayers = 11
   lockdownThreshold = 6
   nRounds = 20
@@ -296,7 +296,7 @@ ggplot(PlotDFLowCost %>% filter(!OwnStrategy %in% c("Slight Cooperator", "String
        y = "Income in points during game", col = "Own Strategy") +
   lims(y = c(500, 2000)) +
   theme_light()
-  ggsave("ComplexStrategiesLowCost.png", width = 7, height = 5)
+#  ggsave("ComplexStrategiesLowCost.png", width = 7, height = 5)
   
   
   
@@ -312,7 +312,6 @@ for (i in 1:iter) {
   print(b-a)
   
 }
-
 
 PlotDFHighCost <- PlotData %>% 
   group_by(Number_of_Defectors, OwnStrategy) %>% 
@@ -333,7 +332,7 @@ ggplot(PlotDFHighCost %>% filter(!OwnStrategy %in% c("Slight Cooperator", "Strin
        y = "Income in points during game", col = "Own Strategy") +
   lims(y = c(500, 2000)) +
   theme_light()
-  ggsave("ComplexStrategiesHighCost.png", width = 7, height = 5)
+#  ggsave("ComplexStrategiesHighCost.png", width = 7, height = 5)
 
 beepr::beep()
 
