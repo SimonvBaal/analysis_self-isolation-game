@@ -7,15 +7,16 @@ output: html_document
 
 ```{r libraries}
 library(tidyverse)
-
+#renv::init()
 ```
 
 ```{r loading data files}
-rawPublicGoods <- read_csv('Public_Goods_Raw.csv')
-rawSurvey <- read_csv('Survey_Raw.csv')
 
-exp1RawSurvey <- read_csv('SurveysExperiment1.csv')
-exp1RawGame <- read_csv("gameData1.csv")
+rawPublicGoods <- read_csv('./raw-data/Public_Goods_Raw.csv')
+rawSurvey <- read_csv('./raw-data/Survey_Raw.csv')
+
+exp1RawSurvey <- read_csv('./raw-data/SurveysExperiment1.csv')
+exp1RawGame <- read_csv("./raw-data/gameData1.csv")
 
 
 ```
@@ -77,41 +78,61 @@ rawPublicGoods <-
 #DNF %>% group_by(session.code) %>% summarise(n = n())
 # 064qyher has 8, the rest has 9 participants.
 
-rawPublicGoods <- 
+rawPublicGoods <-
   rawPublicGoods %>%
-  mutate(group.number_of_players = ifelse(session.code == '064qyher', 8, 9),
-         player.second_player_contribution_0 = ifelse(player.second_player_contribution_0 == 5, 
-                                                      NA,
-                                                      player.second_player_contribution_0),
-         player.second_player_contribution_1 = ifelse(player.second_player_contribution_1 == 5, 
-                                                      NA,
-                                                      player.second_player_contribution_1),
-         player.second_player_contribution_2 = ifelse(player.second_player_contribution_2 == 5, 
-                                                      NA,
-                                                      player.second_player_contribution_2),
-         player.second_player_contribution_3 = ifelse(player.second_player_contribution_3 == 5, 
-                                                      NA,
-                                                      player.second_player_contribution_3),
-         player.second_player_contribution_4 = ifelse(player.second_player_contribution_4 == 5, 
-                                                      NA,
-                                                      player.second_player_contribution_4),
-         player.contribution = ifelse(is.na(player.second_player_contribution_0) &
-                                        is.na(player.second_player_contribution_1) &
-                                        is.na(player.second_player_contribution_2) &
-                                        is.na(player.second_player_contribution_3) &
-                                        is.na(player.second_player_contribution_4), 
-                                      NA,
-                                      player.contribution),
-         group.condition = ifelse(player.my_endowment == 40 |
-                                    player.my_endowment == 240, 
-                                  'High Gini',
-                                  ifelse(player.my_endowment == 60 |
-                                           player.my_endowment == 160,
-                                         'Low Gini',
-                                         ifelse(player.my_endowment == 50, 
-                                                'Poverty',
-                                                ifelse(player.my_endowment == 100, 
-                                                       'Equality', NA)))))
+  mutate(
+    group.number_of_players = ifelse(session.code == '064qyher', 8, 9),
+    player.second_player_contribution_0 = ifelse(
+      player.second_player_contribution_0 == 5,
+      NA,
+      player.second_player_contribution_0
+    ),
+    player.second_player_contribution_1 = ifelse(
+      player.second_player_contribution_1 == 5,
+      NA,
+      player.second_player_contribution_1
+    ),
+    player.second_player_contribution_2 = ifelse(
+      player.second_player_contribution_2 == 5,
+      NA,
+      player.second_player_contribution_2
+    ),
+    player.second_player_contribution_3 = ifelse(
+      player.second_player_contribution_3 == 5,
+      NA,
+      player.second_player_contribution_3
+    ),
+    player.second_player_contribution_4 = ifelse(
+      player.second_player_contribution_4 == 5,
+      NA,
+      player.second_player_contribution_4
+    ),
+    player.contribution = ifelse(
+      is.na(player.second_player_contribution_0) &
+        is.na(player.second_player_contribution_1) &
+        is.na(player.second_player_contribution_2) &
+        is.na(player.second_player_contribution_3) &
+        is.na(player.second_player_contribution_4),
+      NA,
+      player.contribution
+    ),
+    group.condition = ifelse(
+      player.my_endowment == 40 |
+        player.my_endowment == 240,
+      'High Gini',
+      ifelse(
+        player.my_endowment == 60 |
+          player.my_endowment == 160,
+        'Low Gini',
+        ifelse(
+          player.my_endowment == 50,
+          'Poverty',
+          ifelse(player.my_endowment == 100,
+                 'Equality', NA)
+        )
+      )
+    )
+  )
 
 publicGoodsData <-
   rawPublicGoods %>%
@@ -186,16 +207,159 @@ exp1GameData <-
          player.second_player_contribution_4 = player.second_player_contribution_4*10
          )
 
-exp1GameData <- 
-  left_join(exp1GameData, exp1RawSurvey, by = c("session.code", "participant.code")) %>%
-  mutate(Order = factor(ifelse(subsession.round_number <= 20 & group.lockdown_cost == 60 | subsession.round_number > 20 & group.lockdown_cost == 90, "Low Cost First", "High Cost First")))
+exp1GameData <-
+  left_join(exp1GameData,
+            exp1RawSurvey,
+            by = c("session.code", "participant.code")) %>%
+  mutate(Order = factor(
+    ifelse(
+      subsession.round_number <= 20 &
+        group.lockdown_cost == 60 |
+        subsession.round_number > 20 &
+        group.lockdown_cost == 90,
+      "Low Cost First",
+      "High Cost First"
+    )
+  ))
 
 ```
 
+```{r Exclusions, include = FALSE}
+# Identify participants with low effort responses.
+
+#If participants give the same answers for the hypothetical decisions at least 95% of the time, 
+#their hypothetical decisions will be discarded, but the other DVs will be retained. 
+#The same applies for the other DVs, where we will remove low-effort responses identified in this way.
+
+# For incentivised self-isolation:
+perResponse <-
+  exp1RawGame %>%
+  filter(group.lockdown == 0) %>%
+  group_by(participant.code, player.contribution) %>%
+  summarise(n = n()) %>%
+  filter(!is.na(player.contribution))
+
+nTrials <- 
+  perResponse %>%
+  group_by(participant.code) %>%
+  summarise(numberOfResponsesIncentivised = sum(n))
+
+toBeExcluded1 <-
+  left_join(perResponse, nTrials) %>%
+  filter(n >= .95*numberOfResponsesIncentivised)
+
+# For predictions of others' self-isolation
+perResponse <- 
+  exp1GameData %>%
+  filter(group.lockdown == 0) %>%
+  group_by(participant.code, player.others_prediction) %>%
+  summarise(n = n()) %>%
+  filter(!is.na(player.others_prediction))
+
+nTrials <- 
+  perResponse %>% 
+  group_by(participant.code) %>%
+  summarise(numberOfResponsesPredict = sum(n))
+
+toBeExcluded2 <- 
+  left_join(perResponse, nTrials) %>%
+  filter(n >= .95*numberOfResponsesPredict)
+
+  
+# We will use H2bdata to do the same for the hypotheticals. Borrowing this dataset creation from below.
+H2bData <-
+  exp1GameData %>%
+  filter(group.lockdown == 0) %>%
+  pivot_longer(
+    cols = c(
+      "player.second_player_contribution_0",
+      "player.second_player_contribution_1",
+      "player.second_player_contribution_2",
+      "player.second_player_contribution_3",
+      "player.second_player_contribution_4"
+    ),
+    names_to = "AssumedOthersSelfIsolation",
+    values_to = "HypotheticalSelfIsolation"
+  ) %>%
+  mutate(AssumedOthersSelfIsolation = as.numeric(substr(
+    AssumedOthersSelfIsolation,
+    start = 35,
+    stop = 36
+  )))
+
+perResponse <- 
+  H2bData %>%
+  filter(group.lockdown == 0) %>%
+  group_by(participant.code, HypotheticalSelfIsolation) %>%
+  summarise(n = n()) %>%
+  filter(!is.na(HypotheticalSelfIsolation))
+
+nTrials <- 
+  perResponse %>% 
+  group_by(participant.code) %>%
+  summarise(numberOfResponsesHypothetical = sum(n))
+
+toBeExcluded3 <- 
+  left_join(perResponse, nTrials) %>%
+  filter(n >= .95*numberOfResponsesHypothetical)
+  
+# Partial participant exclusions:
+  
+exp1GameData <-
+  exp1GameData %>%
+  group_by(participant.code) %>%
+  mutate(
+    player.contribution = ifelse(
+      participant.code %in% toBeExcluded1$participant.code,
+      NA,
+      player.contribution
+    ),
+    player.others_prediction = ifelse(
+      participant.code %in% toBeExcluded2$participant.code,
+      NA,
+      player.others_prediction
+    ),
+    player.second_player_contribution_0 = ifelse(
+      participant.code %in% toBeExcluded3$participant.code,
+      NA,
+      player.second_player_contribution_0
+    ),
+    player.second_player_contribution_1 = ifelse(
+      participant.code %in% toBeExcluded3$participant.code,
+      NA,
+      player.second_player_contribution_1
+    ),
+    player.second_player_contribution_2 = ifelse(
+      participant.code %in% toBeExcluded3$participant.code,
+      NA,
+      player.second_player_contribution_2
+    ),
+    player.second_player_contribution_3 = ifelse(
+      participant.code %in% toBeExcluded3$participant.code,
+      NA,
+      player.second_player_contribution_3
+    ),
+    player.second_player_contribution_4 = ifelse(
+      participant.code %in% toBeExcluded3$participant.code,
+      NA,
+      player.second_player_contribution_4
+    )
+  ) %>%
+  ungroup()
+  
+# Full participant exclusions Will be carried out in the hypothesis-bound
+# datasets in the _analysis.Rmd.
+
+#rm(perResponse, nTrials, toBeExcluded1, toBeExcluded2, toBeExcluded3)
+
+```
+
+
+
 ```{r write csv}
 
-write_csv(publicGoodsData, 'CleanedPublicGoods.csv')
-write_csv(exp1GameData, 'Exp1PublicGoodsCleaned.csv')
+write_csv(publicGoodsData, './cleaned-data/CleanedPublicGoods.csv')
+write_csv(exp1GameData, './cleaned-data/Exp1PublicGoodsCleaned.csv')
 
 
 ```

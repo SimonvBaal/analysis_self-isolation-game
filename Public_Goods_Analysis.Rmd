@@ -27,110 +27,33 @@ exp1GameData <- read_csv("Exp1PublicGoodsCleaned.csv")
 ```
 
 
-```{r Exclusions, include = FALSE}
-# Identify participants with low effort responses.
 
-#If participants give the same answers for the hypothetical decisions at least 95% of the time, 
-#their hypothetical decisions will be discarded, but the other DVs will be retained. 
-#The same applies for the other DVs, where we will remove low-effort responses identified in this way.
-
-# For incentivised self-isolation:
-perResponse <-
-  exp1GameData %>%
-  filter(group.lockdown == 0) %>%
-  group_by(participant.code, player.contribution) %>%
-  summarise(n = n()) %>%
-  filter(!is.na(player.contribution))
-
-nTrials <- 
-  perResponse %>%
-  group_by(participant.code) %>%
-  summarise(numberOfResponsesIncentivised = sum(n))
-
-toBeExcluded1 <-
-  left_join(perResponse, nTrials) %>%
-  filter(n >= .95*numberOfResponsesIncentivised)
-
-# For predictions of others' self-isolation
-perResponse <- 
-  exp1GameData %>%
-  filter(group.lockdown == 0) %>%
-  group_by(participant.code, player.others_prediction) %>%
-  summarise(n = n()) %>%
-  filter(!is.na(player.others_prediction))
-
-nTrials <- 
-  perResponse %>% 
-  group_by(participant.code) %>%
-  summarise(numberOfResponsesPredict = sum(n))
-
-toBeExcluded2 <- 
-  left_join(perResponse, nTrials) %>%
-  filter(n >= .95*numberOfResponsesPredict)
-
-  
-# We will use H2bdata to do the same for the hypotheticals. Borrowing this dataset creation from below.
-H2bData <-
-  exp1GameData %>%
-  filter(group.lockdown == 0) %>%
-  pivot_longer(cols = c("player.second_player_contribution_0", "player.second_player_contribution_1", 
-                        "player.second_player_contribution_2", "player.second_player_contribution_3",
-                        "player.second_player_contribution_4"),
-               names_to = "AssumedOthersSelfIsolation",
-               values_to = "HypotheticalSelfIsolation") %>%
-  mutate(AssumedOthersSelfIsolation = as.numeric(substr(AssumedOthersSelfIsolation, start = 35, stop = 36)))
-
-perResponse <- 
-  H2bData %>%
-  filter(group.lockdown == 0) %>%
-  group_by(participant.code, HypotheticalSelfIsolation) %>%
-  summarise(n = n()) %>%
-  filter(!is.na(HypotheticalSelfIsolation))
-
-nTrials <- 
-  perResponse %>% 
-  group_by(participant.code) %>%
-  summarise(numberOfResponsesHypothetical = sum(n))
-
-toBeExcluded3 <- 
-  left_join(perResponse, nTrials) %>%
-  filter(n >= .95*numberOfResponsesHypothetical)
-  
-# Partial participant exclusions:
-  
-exp1GameData <-   
-  exp1GameData %>%
-    group_by(participant.code) %>%  
-    mutate(player.contribution = ifelse(participant.code %in% toBeExcluded1$participant.code, NA, player.contribution),
-         player.others_prediction = ifelse(participant.code %in% toBeExcluded2$participant.code, NA, player.others_prediction),
-         player.second_player_contribution_0 = ifelse(participant.code %in% toBeExcluded3$participant.code, NA, player.second_player_contribution_0),
-         player.second_player_contribution_1 = ifelse(participant.code %in% toBeExcluded3$participant.code, NA, player.second_player_contribution_1),
-         player.second_player_contribution_2 = ifelse(participant.code %in% toBeExcluded3$participant.code, NA, player.second_player_contribution_2),
-         player.second_player_contribution_3 = ifelse(participant.code %in% toBeExcluded3$participant.code, NA, player.second_player_contribution_3),
-         player.second_player_contribution_4 = ifelse(participant.code %in% toBeExcluded3$participant.code, NA, player.second_player_contribution_4)) %>%
-  ungroup()
-  
-# Full participant exclusions Will be carried out in the hypothesis-bound datasets below.
-
-#rm(perResponse, nTrials, toBeExcluded1, toBeExcluded2, toBeExcluded3)
-
-```
 
 
 ```{r Datasets for each hypothesis, include = FALSE}
 
-H1Data <- 
-  exp1GameData %>% 
-  filter(group.lockdown == 0, group.total_infections < 6,
-         !(participant.code %in% toBeExcluded1$participant.code & participant.code %in% toBeExcluded2$participant.code),
-         player.timeout != 1) %>%
-  mutate(centeredRoundNumber = scale(subsession.round_number, scale = F),
-         centeredCases = scale(group.total_infections, scale = F),
-         centeredLockdownCost = scale(group.lockdown_cost, scale = F),
-         centeredPrediction = scale(player.others_prediction, scale = F),
-         centeredLastRoundOthers = scale(lastRoundOthers, scale = F))
-# 131 participants: View(H1Data %>% group_by(session.code,participant.code) %>% summarise(n = n()))
-# 3ej41aon, eej4bm0z, lui4ds0m were all excluded. 
+H1Data <-
+  exp1GameData %>%
+  filter(
+    group.lockdown == 0,
+    group.total_infections < 6,
+    !(
+      participant.code %in% toBeExcluded1$participant.code &
+        participant.code %in% toBeExcluded2$participant.code
+    ),
+    player.timeout != 1
+  ) %>%
+  mutate(
+    centeredRoundNumber = scale(subsession.round_number, scale = F),
+    centeredCases = scale(group.total_infections, scale = F),
+    centeredLockdownCost = scale(group.lockdown_cost, scale = F),
+    centeredPrediction = scale(player.others_prediction, scale = F),
+    centeredLastRoundOthers = scale(lastRoundOthers, scale = F)
+  )
+# 131 participants: View(H1Data %>% 
+#                         group_by(session.code,participant.code) %>% 
+#                         summarise(n = n()))
+# 3ej41aon, eej4bm0z, lui4ds0m were excluded. 
 
 H2bData <-
   exp1GameData %>%
@@ -572,6 +495,7 @@ ExploratoryAnalysis <-
        data = H2bData,
        method = "S")
 
+
 ExploratoryEmmeans <- 
   emtrends(ExploratoryAnalysis, var = "AssumedOthersSelfIsolation", specs = "group.lockdown_cost", lmer.df = "satterthwaite")
 
@@ -594,6 +518,16 @@ IncentivisedPredictionData <-
 
 IncentivisedPredictionWilcoxon <-
   wilcox.test(SelfIsolation ~ Type, data = IncentivisedPredictionData, paired = T, alternative = "greater")
+
+a <- 
+  mixed(player.contribution ~
+          centeredRoundNumber +
+          centeredPrediction +
+          centeredLastRoundOthers +
+          centeredCases * group.lockdown_cost +
+          (centeredRoundNumber|participant.code),
+        data = H1Data)  
+
 
 ```
 
