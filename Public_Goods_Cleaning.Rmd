@@ -183,13 +183,20 @@ exp1RawGame <-
          group.lockdown_number,
          group.lockdown_cost,
          group.patient_zero_switch)
+```
 
+```{r Exclusions on basis of participation}
 # Excluding participants who did not finish the experiment.
 DNFexp1 <- 
   exp1RawGame %>%
   group_by(session.code, participant.code) %>%
   summarise(cumulativeEarnings = max(player.cumulative_earnings)) %>%
   filter(cumulativeEarnings > 1500, session.code != 'q1uimr6i')
+
+# Check against number of timeouts 
+exp1RawGame %>% group_by(participant.code) %>% 
+  summarise(nTimeout = sum(player.timeout)) %>% 
+  filter(nTimeout > 10)
 
 exp1GameData <- 
   exp1RawGame %>% 
@@ -250,7 +257,7 @@ toBeExcluded1 <-
 
 # For predictions of others' self-isolation
 perResponse <- 
-  exp1GameData %>%
+  exp1RawGame %>%
   filter(group.lockdown == 0) %>%
   group_by(participant.code, player.others_prediction) %>%
   summarise(n = n()) %>%

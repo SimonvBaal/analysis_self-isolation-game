@@ -27,9 +27,6 @@ exp1GameData <- read_csv("Exp1PublicGoodsCleaned.csv")
 ```
 
 
-
-
-
 ```{r Datasets for each hypothesis, include = FALSE}
 
 H1Data <-
