@@ -1,5 +1,5 @@
 ---
-title: "Self-Isolation Game Modelling"
+title: "Self-Isolation Game Simulations"
 author: "Simon van Baal"
 date: "21/05/2021"
 output: html_document
@@ -215,15 +215,18 @@ SelfIsolationGame <-
             
             lockdown <- append(lockdown, 0) # No longer in lockdown
             patientZeroSwitch <-
-              append(patientZeroSwitch, 1) # To indicate that we are playing with a new patient zero after lockdown.
+              append(patientZeroSwitch, 1) 
+            # To indicate that we are playing with a new patient zero after lockdown.
             
             # Copy infections from previous rounds.
-            Infections$Infected[(1 + (round - 1) * 11):(11 + (round - 1) *
-                                                          11)] <- Infections$Infected[(1 + (round - 2) * 11):(11 + (round - 2) * 11)]
+            Infections$Infected[
+              (1 + (round - 1) * 11):(11 + (round - 1) * 11)
+              ] <- 
+              Infections$Infected[(1 + (round - 2) * 11):(11 + (round - 2) * 11)]
             
           }
           
-          ##======================================= Determine whether players are infected
+          ##============================= Determine whether players are infected
           
           if (lockdown[round] == 0) {
             # If not in lockdown
@@ -319,9 +322,11 @@ SelfIsolationGame <-
                     (1 - Infections$SelfIsolation[(1 + (round - 1) * 11):(11 + (round - 1) *
                                                                             11)]) * TransmissionPool
                   ),
-                  #Infect with probability (1-SelfIsolation) * TransmissionPool, example: Slight self-isolation, TransmissionPool is 1, rbinom(1,1,.75)
+                  #Infect with probability (1-SelfIsolation) * TransmissionPool, 
+                  #example: Slight self-isolation, TransmissionPool is 1, rbinom(1,1,.75)
                   Infections$Infected[(1 + (round - 1) * 11):(11 + (round -
-                                                                      1) * 11)] # Else, preserve infection
+                                                                      1) * 11)] 
+                  # Else, preserve infection
                 )
             }
             
