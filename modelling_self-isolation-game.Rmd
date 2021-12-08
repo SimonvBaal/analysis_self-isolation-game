@@ -477,7 +477,7 @@ HighCostStaticStrategies <-
 
 
 ggarrange(LowCostStaticStrategies, HighCostStaticStrategies, common.legend = T, legend = "bottom")
-#ggsave("StaticStrategiesPlot.png", height = 4, width = 9, dpi = "print")
+#ggsave("./tables-and-figures/StaticStrategiesPlot.png", height = 4, width = 9, dpi = "print")
 
 
 LowCostDynamicStrategies <- 
@@ -505,7 +505,7 @@ HighCostDynamicStrategies <-
   theme(plot.title = element_text(size = 12))
 
 ggarrange(LowCostDynamicStrategies, HighCostDynamicStrategies, common.legend = T, legend = "bottom")
-#ggsave("DynamicStrategiesPlot.png", height = 4, width = 9, dpi = "print")
+#ggsave("./tables-and-figures/DynamicStrategiesPlot.png", height = 4, width = 9, dpi = "print")
 
 ```
 
@@ -519,7 +519,7 @@ rm(PlotData,
    b,
    i,
    HighIncomeLockdown,
-   LowIncomeLockdown
+   LowIncomeLockdown,
    Results)
 
 
