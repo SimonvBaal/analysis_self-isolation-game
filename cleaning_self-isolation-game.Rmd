@@ -11,8 +11,8 @@ library(tidyverse)
 ```
 
 ```{r loading data files}
-raw_data_survey <- read_csv('./raw-data/SurveysExperiment1.csv')
-raw_data_game <- read_csv("./raw-data/gameData1.csv")
+raw_data_survey <- read_csv('./raw-data/raw-data_survey_self-isolation-game.csv')
+raw_data_game <- read_csv("./raw-data/raw-data_game_self-isolation-game.csv")
 
 ```
 

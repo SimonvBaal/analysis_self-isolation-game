@@ -293,6 +293,7 @@ pairs(ExploratoryEmmeans, reverse = T)
 
 testIncentivisedPrediction
 qnorm(testIncentivisedPrediction$p.value, lower.tail = F)
+
 dataIncentivisedAndBeliefs %>%
   group_by(Type) %>%
   summarise(mean = mean(SelfIsolation),
