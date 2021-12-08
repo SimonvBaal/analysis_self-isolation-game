@@ -474,8 +474,8 @@ HighCostStaticStrategies <-
   theme(plot.title = element_text(size = 12))
 
 
-ggarrange(LowCostStaticStrategies, HighCostStaticStrategies, common.legend = T, legend = "bottom") +
-  ggsave("StaticStrategiesPlot.png", height = 4, width = 9, dpi = "print")
+ggarrange(LowCostStaticStrategies, HighCostStaticStrategies, common.legend = T, legend = "bottom")
+#ggsave("StaticStrategiesPlot.png", height = 4, width = 9, dpi = "print")
 
 
 LowCostDynamicStrategies <- 
@@ -502,7 +502,7 @@ HighCostDynamicStrategies <-
   theme_light() + 
   theme(plot.title = element_text(size = 12))
 
-ggarrange(LowCostDynamicStrategies, HighCostDynamicStrategies, common.legend = T, legend = "bottom") +
-  ggsave("DynamicStrategiesPlot.png", height = 4, width = 9, dpi = "print")
+ggarrange(LowCostDynamicStrategies, HighCostDynamicStrategies, common.legend = T, legend = "bottom")
+#ggsave("DynamicStrategiesPlot.png", height = 4, width = 9, dpi = "print")
 
 ```
