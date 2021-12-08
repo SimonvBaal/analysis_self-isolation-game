@@ -276,8 +276,8 @@ ggsave("plot_round-wise-self-isolation.png",
 
 
 ```{r Table of regression results}
-H1DataStargazer <-
-  H1Data %>%
+dataIncentivisedStargazer <-
+  dataIncentivised %>%
   rename(`Incentivised Self-Isolation` = player.contribution,
          `Round Number` = centeredRoundNumber,
          `Number of Infections` = centeredCases,
@@ -287,19 +287,19 @@ H1DataStargazer <-
          `Participant ID` = participant.code)
 
 
-H1and2aResultsLmer <-
+lmerIncentivised <-
     lmer(`Incentivised Self-Isolation` ~
               `Round Number` +
               `Number of Infections` +
               `Others in Previous Round` +
               `Prediction` +
               (`Round Number`|`Participant ID`),
-          data = H1DataStargazer)
+          data = dataIncentivisedStargazer)
 
-class(H1and2aResultsLmer) <- "lmerMod"
+class(lmerIncentivised) <- "lmerMod"
 
-H2bDataStargazer <-
-  H2bData %>%
+dataHypotheticalStargazer <-
+  dataHypothetical %>%
   rename(`Hypothetical Self-Isolation` = HypotheticalSelfIsolation,
          `Round Number` = centeredRoundNumber,
          `Number of Infections` = centeredCases,
@@ -308,31 +308,31 @@ H2bDataStargazer <-
          `Others in Previous Round` = centeredLastRoundOthers,
          `Participant ID` = participant.code)
 
-H2bResultsLmer <-
+lmerHypothetical <-
   lmer(`Hypothetical Self-Isolation` ~
           `Round Number` +
           `Number of Infections` + 
           `Others in Previous Round` +
           `Self-isolation in Scenario` +
           (`Round Number`|`Participant ID`),
-        data = H2bDataStargazer)
+        data = dataHypotheticalStargazer)
 
-class(H2bResultsLmer) <- "lmerMod"
+class(lmerHypothetical) <- "lmerMod"
 
 
-H3ResultsLmer <-
+lmerBeliefs <-
   lmer(player.others_prediction ~
           `Round Number` +
           `Number of Infections` +
           `Others in Previous Round` +
           (`Round Number`|`Participant ID`),
-        data = H1DataStargazer)
+        data = dataIncentivisedStargazer)
 
-class(H3ResultsLmer) <- "lmerMod"
+class(lmerBeliefs) <- "lmerMod"
 
-stargazer(H1and2aResultsLmer, 
-          H3ResultsLmer, 
-          H2bResultsLmer,
+stargazer(lmerIncentivised, 
+          lmerBeliefs, 
+          lmerHypothetical,
           title = "Regression Results H1-H3",
           out = "regressionTable.htm",
           dep.var.labels = c("Incentivised <br>Self-isolation", "Predictions About <br>Others", "Hypothetical <br>Self-isolation"),
