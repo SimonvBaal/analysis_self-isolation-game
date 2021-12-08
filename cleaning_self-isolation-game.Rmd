@@ -11,15 +11,15 @@ library(tidyverse)
 ```
 
 ```{r loading data files}
-exp1RawSurvey <- read_csv('./raw-data/SurveysExperiment1.csv')
-exp1RawGame <- read_csv("./raw-data/gameData1.csv")
+raw_data_survey <- read_csv('./raw-data/SurveysExperiment1.csv')
+raw_data_game <- read_csv("./raw-data/gameData1.csv")
 
 ```
 
 
 ```{r Data Cleaning Experiment 1}
-exp1RawSurvey <- 
-  exp1RawSurvey %>%
+raw_data_survey <- 
+  raw_data_survey %>%
   select(session.code,
          participant.code,
          player.age,
@@ -28,8 +28,8 @@ exp1RawSurvey <-
          player.location,
          player.attention_check)
 
-exp1RawGame <- 
-  exp1RawGame %>%
+raw_data_game <- 
+  raw_data_game %>%
   filter(session.is_demo == 0) %>%
   select(session.code,
          participant.code,
@@ -61,37 +61,45 @@ exp1RawGame <-
 ```
 
 ```{r Exclusions on basis of participation}
-# Excluding participants who did not finish the experiment.
-DNFexp1 <- 
-  exp1RawGame %>%
-  group_by(session.code, participant.code) %>%
-  summarise(cumulativeEarnings = max(player.cumulative_earnings)) %>%
-  filter(cumulativeEarnings > 1500, session.code != 'q1uimr6i')
+# Excluding participants who did not finish the experiment, or complete
+# enough of it.
 
-# Check against number of timeouts 
-exp1RawGame %>% group_by(participant.code) %>% 
+# We exclude on the basis of timeouts; participants who have not completed more 
+# than 70% of trials are regarded as participants who did not finish.
+DNF <- 
+  raw_data_game %>% 
+  group_by(participant.code, session.code) %>% 
   summarise(nTimeout = sum(player.timeout)) %>% 
-  filter(nTimeout > 10)
+  filter(nTimeout < 12)
 
-exp1GameData <- 
-  exp1RawGame %>% 
-  right_join(DNFexp1, 
-             by = c("participant.code", 
-                             "session.code")) %>%
+# We multiply by ten to indicate the number of points sacrificed.
+cleaned_data_game <-
+  raw_data_game %>%
+  right_join(DNF,
+             by = c("participant.code",
+                    "session.code")) %>%
   arrange(participant.code, subsession.round_number) %>%
-  mutate(lastRoundOthers = lag(player.others_contribution_percentage),
-         player.contribution = player.contribution*10,
-         player.others_prediction = player.others_prediction*10,
-         player.second_player_contribution_0 = player.second_player_contribution_0*10,
-         player.second_player_contribution_1 = player.second_player_contribution_1*10,
-         player.second_player_contribution_2 = player.second_player_contribution_2*10,
-         player.second_player_contribution_3 = player.second_player_contribution_3*10,
-         player.second_player_contribution_4 = player.second_player_contribution_4*10
-         )
+  mutate(
+    lastRoundOthers =
+      lag(player.others_contribution_percentage),
+    player.contribution = player.contribution * 10,
+    player.others_prediction = player.others_prediction * 10,
+    player.second_player_contribution_0 = player.second_player_contribution_0 *
+      10,
+    player.second_player_contribution_1 = player.second_player_contribution_1 *
+      10,
+    player.second_player_contribution_2 = player.second_player_contribution_2 *
+      10,
+    player.second_player_contribution_3 = player.second_player_contribution_3 *
+      10,
+    player.second_player_contribution_4 = player.second_player_contribution_4 *
+      10
+  )
 
-exp1GameData <-
-  left_join(exp1GameData,
-            exp1RawSurvey,
+
+cleaned_data_game <-
+  left_join(cleaned_data_game,
+            raw_data_survey,
             by = c("session.code", "participant.code")) %>%
   mutate(Order = factor(
     ifelse(
@@ -109,48 +117,51 @@ exp1GameData <-
 ```{r Exclusions, include = FALSE}
 # Identify participants with low effort responses.
 
-#If participants give the same answers for the hypothetical decisions at least 95% of the time, 
-#their hypothetical decisions will be discarded, but the other DVs will be retained. 
-#The same applies for the other DVs, where we will remove low-effort responses identified in this way.
+# If participants give the same answers for the hypothetical decisions at least 
+# 95% of the time, their hypothetical decisions will be discarded, but the other 
+# DVs will be retained. The same applies for the other DVs, where we will remove
+# low-effort responses identified in this way.
 
 # For incentivised self-isolation:
 perResponse <-
-  exp1RawGame %>%
+  cleaned_data_game %>%
   filter(group.lockdown == 0) %>%
-  group_by(participant.code, player.contribution) %>%
+  group_by(participant.code, player.contribution,
+           player.attention_check) %>%
   summarise(n = n()) %>%
   filter(!is.na(player.contribution))
 
-nTrials <- 
+nTrials <-
   perResponse %>%
-  group_by(participant.code) %>%
+  group_by(participant.code, player.attention_check) %>%
   summarise(numberOfResponsesIncentivised = sum(n))
 
 toBeExcluded1 <-
-  left_join(perResponse, nTrials) %>%
+  perResponse %>%
+  left_join(nTrials) %>%
   filter(n >= .95*numberOfResponsesIncentivised)
 
 # For predictions of others' self-isolation
-perResponse <- 
-  exp1RawGame %>%
+perResponse <-
+  cleaned_data_game %>%
   filter(group.lockdown == 0) %>%
   group_by(participant.code, player.others_prediction) %>%
   summarise(n = n()) %>%
   filter(!is.na(player.others_prediction))
 
-nTrials <- 
-  perResponse %>% 
+nTrials <-
+  perResponse %>%
   group_by(participant.code) %>%
   summarise(numberOfResponsesPredict = sum(n))
 
-toBeExcluded2 <- 
+toBeExcluded2 <-
   left_join(perResponse, nTrials) %>%
   filter(n >= .95*numberOfResponsesPredict)
 
-  
-# We will use H2bdata to do the same for the hypotheticals. Borrowing this dataset creation from below.
+# We will use H2bdata to do the same for the hypotheticals.
+# Borrowing this dataset creation from the analysis .
 H2bData <-
-  exp1GameData %>%
+  cleaned_data_game %>%
   filter(group.lockdown == 0) %>%
   pivot_longer(
     cols = c(
@@ -169,70 +180,35 @@ H2bData <-
     stop = 36
   )))
 
-perResponse <- 
+perResponse <-
   H2bData %>%
   filter(group.lockdown == 0) %>%
   group_by(participant.code, HypotheticalSelfIsolation) %>%
   summarise(n = n()) %>%
   filter(!is.na(HypotheticalSelfIsolation))
 
-nTrials <- 
-  perResponse %>% 
+nTrials <-
+  perResponse %>%
   group_by(participant.code) %>%
   summarise(numberOfResponsesHypothetical = sum(n))
 
-toBeExcluded3 <- 
+toBeExcluded3 <-
   left_join(perResponse, nTrials) %>%
+  mutate(percIdentical = n/numberOfResponsesHypothetical) %>%
   filter(n >= .95*numberOfResponsesHypothetical)
-  
-# Partial participant exclusions:
-  
-exp1GameData <-
-  exp1GameData %>%
-  group_by(participant.code) %>%
-  mutate(
-    player.contribution = ifelse(
-      participant.code %in% toBeExcluded1$participant.code,
-      NA,
-      player.contribution
-    ),
-    player.others_prediction = ifelse(
-      participant.code %in% toBeExcluded2$participant.code,
-      NA,
-      player.others_prediction
-    ),
-    player.second_player_contribution_0 = ifelse(
-      participant.code %in% toBeExcluded3$participant.code,
-      NA,
-      player.second_player_contribution_0
-    ),
-    player.second_player_contribution_1 = ifelse(
-      participant.code %in% toBeExcluded3$participant.code,
-      NA,
-      player.second_player_contribution_1
-    ),
-    player.second_player_contribution_2 = ifelse(
-      participant.code %in% toBeExcluded3$participant.code,
-      NA,
-      player.second_player_contribution_2
-    ),
-    player.second_player_contribution_3 = ifelse(
-      participant.code %in% toBeExcluded3$participant.code,
-      NA,
-      player.second_player_contribution_3
-    ),
-    player.second_player_contribution_4 = ifelse(
-      participant.code %in% toBeExcluded3$participant.code,
-      NA,
-      player.second_player_contribution_4
-    )
-  ) %>%
-  ungroup()
-  
-# Full participant exclusions Will be carried out in the hypothesis-bound
-# datasets in the _analysis.Rmd.
 
-#rm(perResponse, nTrials, toBeExcluded1, toBeExcluded2, toBeExcluded3)
+# No participants needed to be excluded according to these criteria.
+
+
+# If necessary, it's possible to assess the robustness of results to excluding
+# participants who failed the attention check (uncomment below). 
+# The results appear the same. 
+
+# dataAttentionCheck <-
+#   cleaned_data_game %>%
+#   filter(player.attention_check == "Chicago")
+
+rm(perResponse, nTrials, toBeExcluded1, toBeExcluded2, toBeExcluded3, DNF)
 
 ```
 
@@ -240,6 +216,7 @@ exp1GameData <-
 
 ```{r write csv}
 
-write_csv(exp1GameData, './cleaned-data/SelfIsoGameCleaned.csv')
+write_csv(cleaned_data_game, './cleaned-data/cleaned_data_self-iso-game.csv')
+rm(raw_data_game, raw_data_survey, cleaned_data_game, H2bData)
 
 ```

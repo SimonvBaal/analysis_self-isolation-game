@@ -1,0 +1,348 @@
+---
+title: 'Self-Isolation Game: Tables and figures'
+author: "Simon van Baal"
+date: "06/12/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+```
+
+```{r Visualisation}
+# We use the numbering in the preregistration.
+#====================================== H1 & Ilussory Superiority
+
+dataInfections <-
+  dataIncentivised %>%
+  filter(group.total_infections < 6) %>%
+  group_by(group.total_infections) %>%
+  summarise(
+    Incentivised_Mean = mean(player.contribution, na.rm = T),
+    Incentivised_Ci = sd(player.contribution, na.rm = T) / sqrt(n()) *
+      1.96,
+    Prediction_Mean = mean(player.others_prediction, na.rm = T),
+    Prediction_Ci = sd(player.others_prediction, na.rm = T) / sqrt(n()) *
+      1.96
+  ) %>%
+  pivot_longer(
+    cols = Incentivised_Mean:Prediction_Ci,
+    names_to = c("Type", "Metric"),
+    names_sep = "_",
+    values_to = "Value"
+  ) %>%
+  pivot_wider(names_from = "Metric", values_from = "Value")
+
+
+plotPredictionIncentivised <-
+  ggplot(dataInfections, aes(
+    x = factor(group.total_infections),
+    y = Mean,
+    col = Type,
+    group = Type
+  )) +
+  geom_point(position = position_dodge(width = .2)) +
+  geom_line(position = position_dodge(width = .2)) +
+  geom_errorbar(aes(ymin = Mean - Ci, ymax = Mean + Ci),
+                width = .2,
+                position = position_dodge(width = .2)) +
+  scale_y_continuous(
+    breaks = c(0, 10, 20, 30, 40),
+    labels = c('None',
+               'Slight' ,
+               'Moderate',
+               'Stringent',
+               'Complete'),
+    minor_breaks = c(5, 15, 25, 35),
+    limits = c(0, 40),
+    sec.axis = sec_axis(trans =  ~ . * 1, name = "Income sacrifice")
+  ) +
+  labs(x = "Number of infections", y = "Self-isolation level") +
+  scale_color_viridis_d(begin = .3, end = .8) +
+  theme_light()
+
+ggsave("plot_illusory-superiority.png", width = 6, height = 4)
+
+```
+
+
+```{r Beliefs effect}
+
+#===================================Beliefs about others' behaviour
+
+#H2a
+
+plotDataIncentivised <-
+  dataIncentivised %>%
+  filter(!is.na(player.others_prediction)) %>%
+  group_by(player.others_prediction) %>%
+  summarise(SelfIsolation = mean(player.contribution, na.rm = T),
+            ci = sd(player.contribution, na.rm = T)/sqrt(n())*1.96)
+
+plotBeliefs <- 
+  ggplot(plotDataIncentivised, aes(x = player.others_prediction, y = SelfIsolation)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = SelfIsolation-ci, ymax = SelfIsolation+ci), width = 2) + 
+  scale_y_continuous(breaks = c(0, 10, 20, 30, 40), 
+                     labels = c('None', 
+                                'Slight' , 
+                                'Moderate', 
+                                'Stringent', 
+                                'Complete'), 
+                     minor_breaks = c(5, 15, 25, 35),
+                     limits = c(0, 40)) +
+  scale_x_continuous(breaks = c(0, 10, 20, 30, 40), 
+                     labels = c('None', 
+                                'Slight' , 
+                                'Moderate', 
+                                'Stringent', 
+                                'Complete'), 
+                     minor_breaks = c(5, 15, 25, 35),
+                     limits = c(-2, 42)) +
+  labs(x = "Prediction of others' behaviour", y = "Incentivised self-isolation") +
+  theme_light()
+
+
+#H2b
+
+plotDataHypothetical <-
+  dataHypothetical %>%
+  group_by(AssumedOthersSelfIsolation) %>%
+  summarise(Hypothetical = mean(HypotheticalSelfIsolation, na.rm = T),
+            ci = sd(HypotheticalSelfIsolation, na.rm = T)/sqrt(n())*1.96)
+
+plotHypothetical <-
+  ggplot(plotDataHypothetical, 
+         aes(x = AssumedOthersSelfIsolation, y = Hypothetical)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = Hypothetical-ci, ymax = Hypothetical+ci), width = 2) + 
+  scale_y_continuous(breaks = c(0, 10, 20, 30, 40), 
+                     labels = c('None', 
+                                'Slight' , 
+                                'Moderate', 
+                                'Stringent', 
+                                'Complete'), 
+                     minor_breaks = c(5, 15, 25, 35),
+                     limits = c(0, 40),
+                     sec.axis = sec_axis(trans = ~.*1, name = "Income sacrifice")) +
+  scale_x_continuous(breaks = c(0, 10, 20, 30, 40), 
+                     labels = c('None', 
+                                'Slight' , 
+                                'Moderate', 
+                                'Stringent', 
+                                'Complete'), 
+                     minor_breaks = c(5, 15, 25, 35),
+                     limits = c(-2, 42)) +
+  labs(x = "Others' self-isolation in scenario", y = "Hypothetical self-isolation") +
+  theme_light()
+
+ggarrange(plotBeliefs, plotHypothetical)
+ggsave("plot_prediction-effect.png", height = 4, width = 9, dpi = "print")
+
+
+```
+
+
+```{r Lockdown cost figure}
+
+#======================================================================= H5
+
+plotDataLockdownCost <-
+  dataIncentivised %>%
+  filter(group.total_infections < 6) %>%
+  group_by(group.lockdown_cost, group.total_infections) %>%
+  summarise(SelfIsolation = mean(player.contribution, na.rm = T),
+            ci = sd(player.contribution, na.rm = T)/sqrt(n())*1.96)
+
+
+plotInfectionsLockdown <-
+  ggplot(plotDataLockdownCost,
+         aes(
+           x = group.total_infections,
+           y = SelfIsolation,
+           col = factor(group.lockdown_cost)
+         )) +
+  geom_point(position = position_dodge(width = .2)) +
+  geom_line(position = position_dodge(width = .2)) +
+  geom_errorbar(
+    aes(ymin = SelfIsolation - ci, ymax = SelfIsolation + ci),
+    width = .2,
+    position = position_dodge(.2)
+  ) +
+  scale_y_continuous(
+    breaks = c(0, 10, 20, 30, 40),
+    labels = c('None',
+               'Slight' ,
+               'Moderate',
+               'Stringent',
+               'Complete'),
+    minor_breaks = c(5, 15, 25, 35),
+    limits = c(0, 40),
+    sec.axis = sec_axis(trans =  ~ . * 1)
+  ) +
+  labs(x = 'Number of infections',
+       y = "Incentivised self-isolation",
+       col = 'Cost of Lockdown') +
+  scale_colour_viridis_d(begin = .8, end = .1) +
+  theme_light()
+
+```
+
+```{r}
+###======== Exploratory Analysis: hypothetical ~ Assumed Self-isolation of others * Lockdown Cost
+
+plotDataLockdownCostHypothetical <-
+  dataHypothetical %>%
+  filter(!is.na(AssumedOthersSelfIsolation)) %>%
+  group_by(group.lockdown_cost, AssumedOthersSelfIsolation) %>%
+  summarise(SelfIsolation = mean(HypotheticalSelfIsolation, na.rm = T),
+            ci = sd(HypotheticalSelfIsolation, na.rm = T)/sqrt(n())*1.96)
+
+
+plotLockdownCostHypothetical <-
+  ggplot(plotDataLockdownCostHypothetical, 
+       aes(x = AssumedOthersSelfIsolation, y = SelfIsolation, col = factor(group.lockdown_cost),
+           group = factor(group.lockdown_cost))) +
+  geom_point(position = position_dodge(width = 2)) +
+  geom_line(position = position_dodge(width = 2)) +
+  geom_errorbar(aes(ymin = SelfIsolation - ci, ymax = SelfIsolation + ci), 
+                width = 2, position = position_dodge(width = 2)
+                ) +
+  scale_y_continuous(breaks = c(0, 10, 20, 30, 40), 
+                     labels = c('None', 
+                                'Slight' , 
+                                'Moderate', 
+                                'Stringent', 
+                                'Complete'), 
+                     minor_breaks = c(5, 15, 25, 35),
+                     limits = c(0, 40),
+                     sec.axis = sec_axis(trans=~.*1)) +
+  scale_x_continuous(breaks = c(0, 10, 20, 30, 40), 
+                     labels = c('None', 
+                                'Slight' , 
+                                'Moderate', 
+                                'Stringent', 
+                                'Complete'), 
+                     minor_breaks = c(5, 15, 25, 35),
+                     limits = c(-2, 42)) +
+  labs(x = "Self-isolation of others in scenario", y = "Hypothetical self-isolation", col = "Cost of Lockdown") +
+  scale_colour_viridis_d(begin = .8, end = .1) +
+  theme_light()
+
+
+ggarrange(
+  plotInfectionsLockdown,
+  plotLockdownCostHypothetical,
+  common.legend = T,
+  legend = "bottom"
+)
+ggsave("plot_lockdown.png", width  = 8, height = 4)
+
+
+```
+
+
+```{r Self-isolation by round}
+
+#====================================================================== Self-isolation levels per round.
+
+ggplot(dataIncentivised %>%
+         group_by(subsession.round_number, Order, group.lockdown_cost) %>%
+         summarise(selfIsolation = mean(player.contribution, na.rm = T)) %>%
+         mutate(CostOfLockdown = factor(group.lockdown_cost)),
+  aes(x = subsession.round_number, y = selfIsolation, 
+      col = Order, shape = CostOfLockdown)) +
+  geom_point(size = 1.4) +
+  lims(y = c(0, 40)) +
+  scale_y_continuous(breaks = c(0, 10, 20, 30, 40), 
+                     labels = c('None', 
+                                'Slight' , 
+                                'Moderate', 
+                                'Stringent', 
+                                'Complete'), 
+                     minor_breaks = c(5, 15, 25, 35),
+                     limits = c(0, 40),
+                     sec.axis = sec_axis(trans=~.*1)) +
+  labs(x = "Round number", y = "Incentivised self-isolation", 
+       shape = "Cost of lockdown") +
+  scale_color_viridis_d(begin = .3, end = .7) +
+  theme_light()
+ggsave("plot_round-wise-self-isolation.png", 
+         height = 5, 
+         width = 7)
+
+
+```
+
+
+```{r Table of regression results}
+H1DataStargazer <-
+  H1Data %>%
+  rename(`Incentivised Self-Isolation` = player.contribution,
+         `Round Number` = centeredRoundNumber,
+         `Number of Infections` = centeredCases,
+         `Cost of Lockdown` = centeredLockdownCost,
+         `Prediction` = centeredPrediction,
+         `Others in Previous Round` = centeredLastRoundOthers,
+         `Participant ID` = participant.code)
+
+
+H1and2aResultsLmer <-
+    lmer(`Incentivised Self-Isolation` ~
+              `Round Number` +
+              `Number of Infections` +
+              `Others in Previous Round` +
+              `Prediction` +
+              (`Round Number`|`Participant ID`),
+          data = H1DataStargazer)
+
+class(H1and2aResultsLmer) <- "lmerMod"
+
+H2bDataStargazer <-
+  H2bData %>%
+  rename(`Hypothetical Self-Isolation` = HypotheticalSelfIsolation,
+         `Round Number` = centeredRoundNumber,
+         `Number of Infections` = centeredCases,
+         `Cost of Lockdown` = centeredLockdownCost,
+         `Self-isolation in Scenario` = centeredScenario,
+         `Others in Previous Round` = centeredLastRoundOthers,
+         `Participant ID` = participant.code)
+
+H2bResultsLmer <-
+  lmer(`Hypothetical Self-Isolation` ~
+          `Round Number` +
+          `Number of Infections` + 
+          `Others in Previous Round` +
+          `Self-isolation in Scenario` +
+          (`Round Number`|`Participant ID`),
+        data = H2bDataStargazer)
+
+class(H2bResultsLmer) <- "lmerMod"
+
+
+H3ResultsLmer <-
+  lmer(player.others_prediction ~
+          `Round Number` +
+          `Number of Infections` +
+          `Others in Previous Round` +
+          (`Round Number`|`Participant ID`),
+        data = H1DataStargazer)
+
+class(H3ResultsLmer) <- "lmerMod"
+
+stargazer(H1and2aResultsLmer, 
+          H3ResultsLmer, 
+          H2bResultsLmer,
+          title = "Regression Results H1-H3",
+          out = "regressionTable.htm",
+          dep.var.labels = c("Incentivised <br>Self-isolation", "Predictions About <br>Others", "Hypothetical <br>Self-isolation"),
+          covariate.labels = c("Round Number",
+                               "Number of Infections",
+                               "Others in Previous Round",
+                               "Prediction",
+                               "Assumed Self-isolation <br>of Others"),
+          align = TRUE,
+          no.space = TRUE)
+
+
+```
