@@ -61,7 +61,7 @@ plotPredictionIncentivised <-
   scale_color_viridis_d(begin = .3, end = .8) +
   theme_light()
 
-ggsave("plot_illusory-superiority.png", width = 6, height = 4)
+ggsave("plot_illusory-superiority.png", width = 7.5, height = 5.4)
 
 ```
 
@@ -186,11 +186,6 @@ plotInfectionsLockdown <-
   scale_colour_viridis_d(begin = .8, end = .1) +
   theme_light()
 
-```
-
-```{r}
-###======== Exploratory Analysis: hypothetical ~ Assumed Self-isolation of others * Lockdown Cost
-
 plotDataLockdownCostHypothetical <-
   dataHypothetical %>%
   filter(!is.na(AssumedOthersSelfIsolation)) %>%
@@ -225,7 +220,9 @@ plotLockdownCostHypothetical <-
                                 'Complete'), 
                      minor_breaks = c(5, 15, 25, 35),
                      limits = c(-2, 42)) +
-  labs(x = "Self-isolation of others in scenario", y = "Hypothetical self-isolation", col = "Cost of Lockdown") +
+  labs(x = "Self-isolation of others in scenario", 
+       y = "Hypothetical self-isolation", 
+       col = "Cost of Lockdown") +
   scale_colour_viridis_d(begin = .8, end = .1) +
   theme_light()
 
@@ -244,7 +241,7 @@ ggsave("plot_lockdown.png", width  = 8, height = 4)
 
 ```{r Self-isolation by round}
 
-#====================================================================== Self-isolation levels per round.
+#====================================== Self-isolation levels per round.
 
 ggplot(dataIncentivised %>%
          group_by(subsession.round_number, Order, group.lockdown_cost) %>%
@@ -330,19 +327,27 @@ lmerBeliefs <-
 
 class(lmerBeliefs) <- "lmerMod"
 
-stargazer(lmerIncentivised, 
-          lmerBeliefs, 
-          lmerHypothetical,
-          title = "Regression Results H1-H3",
-          out = "regressionTable.htm",
-          dep.var.labels = c("Incentivised <br>Self-isolation", "Predictions About <br>Others", "Hypothetical <br>Self-isolation"),
-          covariate.labels = c("Round Number",
-                               "Number of Infections",
-                               "Others in Previous Round",
-                               "Prediction",
-                               "Assumed Self-isolation <br>of Others"),
-          align = TRUE,
-          no.space = TRUE)
+stargazer(
+  lmerIncentivised,
+  lmerBeliefs,
+  lmerHypothetical,
+  title = "Regression Results H1-H3",
+  out = "regressionTable.html",
+  dep.var.labels = c(
+    "Incentivised <br>Self-isolation",
+    "Predictions About <br>Others",
+    "Hypothetical <br>Self-isolation"
+  ),
+  covariate.labels = c(
+    "Round Number",
+    "Number of Infections",
+    "Others in Previous Round",
+    "Prediction",
+    "Assumed Self-isolation <br>of Others"
+  ),
+  align = TRUE,
+  no.space = TRUE
+)
 
 
 ```
