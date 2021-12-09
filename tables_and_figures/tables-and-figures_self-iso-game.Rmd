@@ -1,7 +1,7 @@
 ---
 title: 'Self-Isolation Game: Tables and figures'
 author: "Simon van Baal"
-date: "06/12/2021"
+date: "09/12/2021"
 output: html_document
 ---
 
