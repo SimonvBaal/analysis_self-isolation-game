@@ -279,7 +279,7 @@ dataIncentivisedStargazer <-
          `Round Number` = centeredRoundNumber,
          `Number of Infections` = centeredCases,
          `Cost of Lockdown` = centeredLockdownCost,
-         `Prediction` = centeredPrediction,
+         `Beliefs` = centeredPrediction,
          `Others in Previous Round` = centeredLastRoundOthers,
          `Participant ID` = participant.code)
 
@@ -289,7 +289,7 @@ lmerIncentivised <-
               `Round Number` +
               `Number of Infections` +
               `Others in Previous Round` +
-              `Prediction` +
+              `Beliefs` +
               (`Round Number`|`Participant ID`),
           data = dataIncentivisedStargazer)
 
@@ -335,14 +335,14 @@ stargazer(
   out = "regressionTable.html",
   dep.var.labels = c(
     "Incentivised <br>Self-isolation",
-    "Predictions About <br>Others",
+    "Beliefs About <br>Others",
     "Hypothetical <br>Self-isolation"
   ),
   covariate.labels = c(
     "Round Number",
     "Number of Infections",
     "Others in Previous Round",
-    "Prediction",
+    "Beliefs",
     "Assumed Self-isolation <br>of Others"
   ),
   align = TRUE,
