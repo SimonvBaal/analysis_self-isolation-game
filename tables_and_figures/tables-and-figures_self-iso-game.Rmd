@@ -7,6 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 library(tidyverse)
+library(ggpubr)
 ```
 
 ```{r Visualisation}
@@ -21,20 +22,21 @@ dataInfections <-
     Incentivised_Mean = mean(player.contribution, na.rm = T),
     Incentivised_Ci = sd(player.contribution, na.rm = T) / sqrt(n()) *
       1.96,
-    Prediction_Mean = mean(player.others_prediction, na.rm = T),
-    Prediction_Ci = sd(player.others_prediction, na.rm = T) / sqrt(n()) *
+    Beliefs_Mean = mean(player.others_prediction, na.rm = T),
+    Beliefs_Ci = sd(player.others_prediction, na.rm = T) / sqrt(n()) *
       1.96
   ) %>%
   pivot_longer(
-    cols = Incentivised_Mean:Prediction_Ci,
+    cols = Incentivised_Mean:Beliefs_Ci,
     names_to = c("Type", "Metric"),
     names_sep = "_",
     values_to = "Value"
   ) %>%
-  pivot_wider(names_from = "Metric", values_from = "Value")
+  pivot_wider(names_from = "Metric", values_from = "Value") %>%
+  mutate(Type = factor(Type, levels = c("Incentivised", "Beliefs")))
 
 
-plotPredictionIncentivised <-
+plotBeliefsIncentivised <-
   ggplot(dataInfections, aes(
     x = factor(group.total_infections),
     y = Mean,
@@ -58,7 +60,7 @@ plotPredictionIncentivised <-
     sec.axis = sec_axis(trans =  ~ . * 1, name = "Income sacrifice")
   ) +
   labs(x = "Number of infections", y = "Self-isolation level") +
-  scale_color_viridis_d(begin = .3, end = .8) +
+  scale_color_viridis_d(begin = .3, end = .7) +
   theme_light()
 
 ggsave("plot_illusory-superiority.png", width = 7.5, height = 5.4)
@@ -99,7 +101,7 @@ plotBeliefs <-
                                 'Complete'), 
                      minor_breaks = c(5, 15, 25, 35),
                      limits = c(-2, 42)) +
-  labs(x = "Prediction of others' behaviour", y = "Incentivised self-isolation") +
+  labs(x = "Beliefs of others' behaviour", y = "Incentivised self-isolation") +
   theme_light()
 
 
@@ -279,7 +281,7 @@ dataIncentivisedStargazer <-
          `Round Number` = centeredRoundNumber,
          `Number of Infections` = centeredCases,
          `Cost of Lockdown` = centeredLockdownCost,
-         `Prediction` = centeredPrediction,
+         `Beliefs` = centeredPrediction,
          `Others in Previous Round` = centeredLastRoundOthers,
          `Participant ID` = participant.code)
 
@@ -289,7 +291,7 @@ lmerIncentivised <-
               `Round Number` +
               `Number of Infections` +
               `Others in Previous Round` +
-              `Prediction` +
+              `Beliefs` +
               (`Round Number`|`Participant ID`),
           data = dataIncentivisedStargazer)
 
@@ -335,14 +337,14 @@ stargazer(
   out = "regressionTable.html",
   dep.var.labels = c(
     "Incentivised <br>Self-isolation",
-    "Predictions About <br>Others",
+    "Beliefs About <br>Others",
     "Hypothetical <br>Self-isolation"
   ),
   covariate.labels = c(
     "Round Number",
     "Number of Infections",
     "Others in Previous Round",
-    "Prediction",
+    "Beliefs",
     "Assumed Self-isolation <br>of Others"
   ),
   align = TRUE,

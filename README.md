@@ -10,7 +10,7 @@ The raw-data folder contains the raw data for the project, and the cleaned-data 
 
 The 'modelling_self-isolation-game.Rmd' contains the simulations used in the manuscript.
 
-The R environment has been preserved in a lock file, such that it can be run in the future when the packages have been updated.
+The R environment has been preserved in a lock file, such that it can be run in the future when the packages have been updated. It is also possible to load the .RData file directly, in order to have all objects in the environment pre-loaded.
 
 ## Data structure
 
