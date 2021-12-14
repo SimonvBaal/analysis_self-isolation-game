@@ -101,7 +101,7 @@ plotBeliefs <-
                                 'Complete'), 
                      minor_breaks = c(5, 15, 25, 35),
                      limits = c(-2, 42)) +
-  labs(x = "Beliefs of others' behaviour", y = "Incentivised self-isolation") +
+  labs(x = "Beliefs about others' behaviour", y = "Incentivised self-isolation") +
   theme_light()
 
 
