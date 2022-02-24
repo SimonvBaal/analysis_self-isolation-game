@@ -166,8 +166,6 @@ testLockdownCost <- wilcox.test(
 emm_options(pbkrtest.limit = 20000)
 
 
-# FDR p-value adjustment
-
 
 ```
 
@@ -206,6 +204,7 @@ testIncentivisedPrediction <-
   )
 
 
+# FDR p-value adjustment
 p_values_adjusted <- 
   p.adjust(c(2e-16, 2e-16, 2e-16, 2e-16, .000123, .014, .28), "BH")
 
@@ -219,7 +218,7 @@ p_values_adjusted <-
 
 ExploratoryAnalysis <- 
   mixed(HypotheticalSelfIsolation ~ 
-         AssumedOthersSelfIsolation*group.lockdown_cost + 
+         centeredScenario*group.lockdown_cost + 
          centeredRoundNumber + 
          (1|participant.code), 
        data = dataHypothetical,
@@ -229,7 +228,7 @@ ExploratoryAnalysis <-
 ExploratoryEmmeans <-
   emtrends(
     ExploratoryAnalysis,
-    var = "AssumedOthersSelfIsolation",
+    var = "centeredScenario",
     specs = "group.lockdown_cost",
     lmer.df = "satterthwaite"
   )

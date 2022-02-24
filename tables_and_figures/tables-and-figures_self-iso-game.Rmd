@@ -12,7 +12,7 @@ library(ggpubr)
 
 ```{r Visualisation}
 # We use the numbering in the preregistration.
-#====================================== H1 & Ilussory Superiority
+#====================================== H1 & Illusory Superiority
 
 dataInfections <-
   dataIncentivised %>%
