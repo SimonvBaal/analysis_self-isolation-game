@@ -1,18 +1,18 @@
 ---
 title: "Public_Goods_Cleaning"
 author: "Simon van Baal"
-date: "09/12/2021"
+date: "19/11/2020"
 output: html_document
 ---
 
 ```{r libraries}
 library(tidyverse)
-#renv::init()
+renv::init()
 ```
 
 ```{r loading data files}
-raw_data_survey <- read_csv('./raw-data/raw-data_survey_self-isolation-game.csv')
-raw_data_game <- read_csv("./raw-data/raw-data_game_self-isolation-game.csv")
+raw_data_survey <- read_csv('./raw-data/SurveysExperiment1.csv')
+raw_data_game <- read_csv("./raw-data/gameData1.csv")
 
 ```
 
@@ -112,11 +112,93 @@ cleaned_data_game <-
     )
   ))
 
-rm(DNF)
-
 ```
 
-```{r Attention check, include = FALSE}
+```{r Exclusions, include = FALSE}
+# Identify participants with low effort responses.
+
+# If participants give the same answers for the hypothetical decisions at least 
+# 95% of the time, their hypothetical decisions will be discarded, but the other 
+# DVs will be retained. The same applies for the other DVs, where we will remove
+# low-effort responses identified in this way.
+
+# For incentivised self-isolation:
+perResponse <-
+  cleaned_data_game %>%
+  filter(group.lockdown == 0) %>%
+  group_by(participant.code, player.contribution,
+           player.attention_check) %>%
+  summarise(n = n()) %>%
+  filter(!is.na(player.contribution))
+
+nTrials <-
+  perResponse %>%
+  group_by(participant.code, player.attention_check) %>%
+  summarise(numberOfResponsesIncentivised = sum(n))
+
+toBeExcluded1 <-
+  perResponse %>%
+  left_join(nTrials) %>%
+  filter(n >= .95*numberOfResponsesIncentivised)
+
+# For predictions of others' self-isolation
+perResponse <-
+  cleaned_data_game %>%
+  filter(group.lockdown == 0) %>%
+  group_by(participant.code, player.others_prediction) %>%
+  summarise(n = n()) %>%
+  filter(!is.na(player.others_prediction))
+
+nTrials <-
+  perResponse %>%
+  group_by(participant.code) %>%
+  summarise(numberOfResponsesPredict = sum(n))
+
+toBeExcluded2 <-
+  left_join(perResponse, nTrials) %>%
+  filter(n >= .95*numberOfResponsesPredict)
+
+# We will use H2bdata to do the same for the hypotheticals.
+# Borrowing this dataset creation from the analysis .
+H2bData <-
+  cleaned_data_game %>%
+  filter(group.lockdown == 0) %>%
+  pivot_longer(
+    cols = c(
+      "player.second_player_contribution_0",
+      "player.second_player_contribution_1",
+      "player.second_player_contribution_2",
+      "player.second_player_contribution_3",
+      "player.second_player_contribution_4"
+    ),
+    names_to = "AssumedOthersSelfIsolation",
+    values_to = "HypotheticalSelfIsolation"
+  ) %>%
+  mutate(AssumedOthersSelfIsolation = as.numeric(substr(
+    AssumedOthersSelfIsolation,
+    start = 35,
+    stop = 36
+  )))
+
+perResponse <-
+  H2bData %>%
+  filter(group.lockdown == 0) %>%
+  group_by(participant.code, HypotheticalSelfIsolation) %>%
+  summarise(n = n()) %>%
+  filter(!is.na(HypotheticalSelfIsolation))
+
+nTrials <-
+  perResponse %>%
+  group_by(participant.code) %>%
+  summarise(numberOfResponsesHypothetical = sum(n))
+
+toBeExcluded3 <-
+  left_join(perResponse, nTrials) %>%
+  mutate(percIdentical = n/numberOfResponsesHypothetical) %>%
+  filter(n >= .95*numberOfResponsesHypothetical)
+
+# No participants needed to be excluded according to these criteria.
+
 
 # If necessary, it's possible to assess the robustness of results to excluding
 # participants who failed the attention check (uncomment below). 
@@ -126,6 +208,7 @@ rm(DNF)
 #   cleaned_data_game %>%
 #   filter(player.attention_check == "Chicago")
 
+rm(perResponse, nTrials, toBeExcluded1, toBeExcluded2, toBeExcluded3, DNF)
 
 ```
 
@@ -134,6 +217,6 @@ rm(DNF)
 ```{r write csv}
 
 write_csv(cleaned_data_game, './cleaned-data/cleaned_data_self-iso-game.csv')
-rm(raw_data_game, raw_data_survey, cleaned_data_game)
+rm(raw_data_game, raw_data_survey, cleaned_data_game, H2bData)
 
 ```

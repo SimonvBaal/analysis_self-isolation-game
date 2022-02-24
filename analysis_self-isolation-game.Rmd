@@ -1,7 +1,7 @@
 ---
 title: "Self-isolation game analysis"
 author: "Simon van Baal"
-date: "09/12/2021"
+date: "08/12/2021"
 output: html_document
 ---
 
@@ -31,6 +31,8 @@ dataIncentivised <-
   filter(
     group.lockdown == 0,
     group.total_infections < 6,
+#    !(participant.code %in% toBeExcluded1$participant.code &
+#        participant.code %in% toBeExcluded2$participant.code),
     player.timeout != 1
   ) %>%
   mutate(
@@ -40,14 +42,18 @@ dataIncentivised <-
     centeredPrediction = scale(player.others_prediction, scale = F),
     centeredLastRoundOthers = scale(lastRoundOthers, scale = F)
   )
+# 131 participants: View(H1Data %>% 
+#                         group_by(session.code,participant.code) %>% 
+#                         summarise(n = n()))
+# 3ej41aon, eej4bm0z, lui4ds0m were excluded. 
 
 dataHypothetical <-
   data_game %>%
-  filter(group.lockdown == 0) %>%
-  pivot_longer(cols = c("player.second_player_contribution_0",
-                        "player.second_player_contribution_1", 
-                        "player.second_player_contribution_2",
-                        "player.second_player_contribution_3",
+  filter(group.lockdown == 0
+    #     !(participant.code %in% toBeExcluded3$participant.code)
+         ) %>%
+  pivot_longer(cols = c("player.second_player_contribution_0", "player.second_player_contribution_1", 
+                        "player.second_player_contribution_2", "player.second_player_contribution_3",
                         "player.second_player_contribution_4"),
                names_to = "AssumedOthersSelfIsolation",
                values_to = "HypotheticalSelfIsolation") %>%
@@ -65,6 +71,9 @@ dataSocialDesirability <-
   data_game %>%
   filter(
     group.lockdown == 0
+#    !(participant.code %in% toBeExcluded1$participant.code &
+#        participant.code %in% toBeExcluded2$participant.code &
+#        participant.code %in% toBeExcluded3$participant.code)
   ) %>%
   mutate(
     PredictedHypothetical =
@@ -106,7 +115,11 @@ dataSocialDesirability <-
 
 dataLockdownCost <-
   data_game %>%
-  filter(group.lockdown == 0) %>%
+  filter(group.lockdown == 0
+#         !(participant.code %in% toBeExcluded1$participant.code & 
+#             participant.code %in% toBeExcluded2$participant.code & 
+#             participant.code %in% toBeExcluded3$participant.code)
+         ) %>%
   group_by(participant.code, group.lockdown_cost) %>%
   summarise(SelfIsolation = mean(player.contribution, na.rm = T)) %>%
   filter(!is.nan(SelfIsolation))
@@ -167,7 +180,7 @@ emm_options(pbkrtest.limit = 20000)
 
 
 # FDR p-value adjustment
-
+p.adjust(c(.0001, .0001, .000001, .000001, .0001, .00001, .0123), "BH")
 
 ```
 
@@ -181,6 +194,11 @@ dataIncentivisedAndBeliefs <-
   filter(
     group.lockdown == 0,
     group.total_infections < 6,
+#    !(
+#      participant.code %in% toBeExcluded1$participant.code &
+#        participant.code %in% toBeExcluded2$participant.code &
+#        participant.code %in% toBeExcluded3$participant.code
+#    ),
     player.timeout != 1
   ) %>%
   group_by(participant.code) %>%
@@ -205,9 +223,6 @@ testIncentivisedPrediction <-
     alternative = "greater"
   )
 
-
-p_values_adjusted <- 
-  p.adjust(c(2e-16, 2e-16, 2e-16, 2e-16, .000123, .014, .28), "BH")
 
 ```
 
@@ -246,9 +261,8 @@ summary(lmmIncentivised)
 
 summary(lmmHypothetical)
 
-# H3. Predictions of others' degree of self-isolation will be influenced by the 
-# number of total infections in the group. That is, players infer that with 
-#more positive cases, the others are self-isolating to a lower degree.
+# H3. Predictions of others' degree of self-isolation will be influenced by the number of total infections in the group. 
+#     That is, players infer that with more positive cases, the others are self-isolating to a lower degree.
 
 summary(lmmBeliefs)
 
@@ -260,7 +274,7 @@ dataSocialDesirability %>%
   summarise(mean = mean(SelfIsolation, na.rm = F),
             median = median(SelfIsolation),
             sd = sd(SelfIsolation, na.rm = F))
-qnorm(testSocialDesirability$p.value, lower.tail = F)
+qnorm(testLockdownCost$p.value)
 
 
 # H5. Incentivised self-isolation level is higher when the cost of lockdown is higher.
@@ -279,7 +293,6 @@ pairs(ExploratoryEmmeans, reverse = T)
 
 testIncentivisedPrediction
 qnorm(testIncentivisedPrediction$p.value, lower.tail = F)
-
 dataIncentivisedAndBeliefs %>%
   group_by(Type) %>%
   summarise(mean = mean(SelfIsolation),
