@@ -4,4 +4,4 @@
 .Ruserdata
 pilot
 *.ini
-*.png
+**/*.png
