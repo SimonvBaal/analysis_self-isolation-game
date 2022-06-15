@@ -1,0 +1,142 @@
+---
+title: "Cleaning - Self-Isolation Game"
+author: "Simon van Baal"
+date: "09/12/2021"
+output: html_document
+---
+
+```{r libraries}
+library(here)
+library(tidyverse)
+#renv::init()
+```
+
+```{r loading data files}
+raw_data_survey <- 
+  read_csv(here('./raw-data/raw-data_survey_self-isolation-game.csv'))
+raw_data_game <- 
+  read_csv(here("./raw-data/raw-data_game_self-isolation-game.csv"))
+
+```
+
+
+```{r Data Cleaning Experiment 1}
+raw_data_survey <- 
+  raw_data_survey %>%
+  select(session.code,
+         participant.code,
+         player.age,
+         player.gender,
+         player.covid_positive,
+         player.location,
+         player.attention_check)
+
+raw_data_game <- 
+  raw_data_game %>%
+  filter(session.is_demo == 0) %>%
+  select(session.code,
+         participant.code,
+         participant.payoff,
+         subsession.round_number,
+         player.id_in_group,
+         player.infected,
+         player.timeout,
+         player.cumulative_earnings,
+         player.others_prediction,
+         player.contribution,
+         player.others_contribution_percentage,
+         player.actual_payment,
+         player.payoff,
+         player.transmission_chance,
+         player.second_player_contribution_0,
+         player.second_player_contribution_1,
+         player.second_player_contribution_2,
+         player.second_player_contribution_3,
+         player.second_player_contribution_4,
+         group.total_contribution,
+         group.total_infections,
+         group.end_total_infections,
+         group.total_earnings,
+         group.lockdown,
+         group.lockdown_number,
+         group.lockdown_cost,
+         group.patient_zero_switch)
+```
+
+```{r Exclusions on basis of participation}
+# Excluding participants who did not finish the experiment, or complete
+# enough of it.
+
+# We exclude on the basis of timeouts; participants who have not completed more 
+# than 70% of trials are regarded as participants who did not finish.
+DNF <- 
+  raw_data_game %>% 
+  group_by(participant.code, session.code) %>% 
+  summarise(nTimeout = sum(player.timeout)) %>% 
+  filter(nTimeout < 12)
+
+# We multiply by ten to indicate the number of points sacrificed.
+cleaned_data_game <-
+  raw_data_game %>%
+  right_join(DNF,
+             by = c("participant.code",
+                    "session.code")) %>%
+  arrange(participant.code, subsession.round_number) %>%
+  mutate(
+    lastRoundOthers =
+      lag(player.others_contribution_percentage),
+    player.contribution = player.contribution * 10,
+    player.others_prediction = player.others_prediction * 10,
+    player.second_player_contribution_0 = player.second_player_contribution_0 *
+      10,
+    player.second_player_contribution_1 = player.second_player_contribution_1 *
+      10,
+    player.second_player_contribution_2 = player.second_player_contribution_2 *
+      10,
+    player.second_player_contribution_3 = player.second_player_contribution_3 *
+      10,
+    player.second_player_contribution_4 = player.second_player_contribution_4 *
+      10
+  )
+
+
+cleaned_data_game <-
+  left_join(cleaned_data_game,
+            raw_data_survey,
+            by = c("session.code", "participant.code")) %>%
+  mutate(Order = factor(
+    ifelse(
+      subsession.round_number <= 20 &
+        group.lockdown_cost == 60 |
+        subsession.round_number > 20 &
+        group.lockdown_cost == 90,
+      "Low Cost First",
+      "High Cost First"
+    )
+  ))
+
+rm(DNF)
+
+```
+
+```{r Attention check, include = FALSE}
+
+# If necessary, it's possible to assess the robustness of results to excluding
+# participants who failed the attention check (uncomment below). 
+# The results appear the same. 
+
+# dataAttentionCheck <-
+#   cleaned_data_game %>%
+#   filter(player.attention_check == "Chicago")
+
+
+```
+
+
+
+```{r write csv}
+
+write_csv(cleaned_data_game, './cleaned-data/cleaned_data_self-iso-game.csv')
+rm(raw_data_game, raw_data_survey, cleaned_data_game)
+
+```

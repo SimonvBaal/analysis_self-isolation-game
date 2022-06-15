@@ -1,0 +1,8 @@
+---
+title: "Secondary Analysis - Self-Isolation Game"
+author: "Simon van Baal"
+date: '2022-06-15'
+output: html_document
+---
+
+

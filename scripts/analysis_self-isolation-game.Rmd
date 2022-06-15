@@ -1,0 +1,290 @@
+---
+title: "Self-isolation game analysis"
+author: "Simon van Baal"
+date: "09/12/2021"
+output: html_document
+---
+
+
+This Rmd file contains the analysis of the Self-Isolation Game.
+```{r libraries, include = FALSE}
+library(tidyverse)
+library(afex)
+library(ggplot2)
+library(ggpubr)
+library(emmeans)
+library(broom)
+library(stargazer)
+
+```
+
+
+```{r load data, include = FALSE}
+data_game <- 
+  read_csv(here("cleaned-data/cleaned_data_self-iso-game.csv"))
+```
+
+
+```{r Datasets for each hypothesis, include = FALSE}
+
+dataIncentivised <-
+  data_game %>%
+  filter(
+    group.lockdown == 0,
+    group.total_infections < 6,
+    player.timeout != 1
+  ) %>%
+  mutate(
+    centeredRoundNumber = scale(subsession.round_number, scale = F),
+    centeredCases = scale(group.total_infections, scale = F),
+    centeredLockdownCost = scale(group.lockdown_cost, scale = F),
+    centeredPrediction = scale(player.others_prediction, scale = F),
+    centeredLastRoundOthers = scale(lastRoundOthers, scale = F)
+  )
+
+dataHypothetical <-
+  data_game %>%
+  filter(group.lockdown == 0) %>%
+  pivot_longer(cols = c("player.second_player_contribution_0",
+                        "player.second_player_contribution_1", 
+                        "player.second_player_contribution_2",
+                        "player.second_player_contribution_3",
+                        "player.second_player_contribution_4"),
+               names_to = "AssumedOthersSelfIsolation",
+               values_to = "HypotheticalSelfIsolation") %>%
+  mutate(AssumedOthersSelfIsolation = 
+           as.numeric(substr(AssumedOthersSelfIsolation, 
+                             start = 35, 
+                             stop = 36))*10,
+         centeredRoundNumber = scale(subsession.round_number, scale = F),
+         centeredCases = scale(group.total_infections, scale = F),
+         centeredLockdownCost = scale(group.lockdown_cost, scale = F),
+         centeredScenario = scale(AssumedOthersSelfIsolation, scale = F),
+         centeredLastRoundOthers = scale(lastRoundOthers, scale = F))
+
+dataSocialDesirability <-
+  data_game %>%
+  filter(
+    group.lockdown == 0
+  ) %>%
+  mutate(
+    PredictedHypothetical =
+      ifelse(
+        player.others_prediction == 0,
+        player.second_player_contribution_0,
+        ifelse(
+          player.others_prediction == 10,
+          player.second_player_contribution_1,
+          ifelse(
+            player.others_prediction == 20,
+            player.second_player_contribution_2,
+            ifelse(
+              player.others_prediction == 30,
+              player.second_player_contribution_3,
+              ifelse(
+                player.others_prediction == 40,
+                player.second_player_contribution_4,
+                NA
+              )
+            )
+          )
+        )
+      )
+  ) %>%
+  group_by(participant.code) %>%
+  summarise(
+    IncentivisedSelfIsolation = mean(player.contribution, na.rm = T),
+    HypotheticalSelfIsolation = mean(PredictedHypothetical, na.rm = T)
+  ) %>%
+  pivot_longer(
+    cols = c("IncentivisedSelfIsolation", "HypotheticalSelfIsolation"),
+    names_to = "Type",
+    values_to = "SelfIsolation"
+  ) %>%
+  filter(!is.nan(SelfIsolation)) %>%
+  group_by(participant.code) %>%
+  filter(n() > 1)
+
+dataLockdownCost <-
+  data_game %>%
+  filter(group.lockdown == 0) %>%
+  group_by(participant.code, group.lockdown_cost) %>%
+  summarise(SelfIsolation = mean(player.contribution, na.rm = T)) %>%
+  filter(!is.nan(SelfIsolation))
+
+```
+
+
+```{r Analysis for p-values and DFs}
+emm_options(pbkrtest.limit = 20000, lmerTest.limit = 20000)
+
+lmmIncentivised <-
+  mixed(player.contribution ~
+          centeredRoundNumber +
+          centeredCases +
+          centeredPrediction +
+          centeredLastRoundOthers +
+          (centeredRoundNumber|participant.code),
+        data = dataIncentivised)
+
+
+lmmHypothetical <-
+  mixed(HypotheticalSelfIsolation ~
+          centeredScenario +
+          centeredLastRoundOthers +
+          centeredCases +
+          centeredRoundNumber +
+          (centeredRoundNumber|participant.code),
+        data = dataHypothetical,
+        method = "S")
+
+
+# Run model to see whether number of cases 
+lmmBeliefs <-
+  mixed(player.others_prediction ~
+          centeredLastRoundOthers +
+          centeredCases +
+          centeredRoundNumber +
+          (centeredRoundNumber|participant.code),
+        data = dataIncentivised)
+
+
+testSocialDesirability <- wilcox.test(
+  SelfIsolation ~ Type,
+  data = dataSocialDesirability,
+  paired = T,
+  alternative = "greater"
+)
+
+
+testLockdownCost <- wilcox.test(
+  SelfIsolation ~ group.lockdown_cost,
+  data = dataLockdownCost,
+  paired = T,
+  alternative = "less"
+)
+
+emm_options(pbkrtest.limit = 20000)
+
+
+
+```
+
+
+```{r Illusory superiority}
+
+# Now we test whether predictions are lower than incentivised self-isolation.
+
+dataIncentivisedAndBeliefs <-
+  data_game %>%
+  filter(
+    group.lockdown == 0,
+    group.total_infections < 6,
+    player.timeout != 1
+  ) %>%
+  group_by(participant.code) %>%
+  summarise(
+    IncentivisedSelfIsolation = mean(player.contribution, na.rm = T),
+    Prediction = mean(player.others_prediction, na.rm = T)
+  ) %>%
+  pivot_longer(
+    cols = c("IncentivisedSelfIsolation", "Prediction"),
+    names_to = "Type",
+    values_to = "SelfIsolation"
+  ) %>%
+  filter(!is.nan(SelfIsolation)) %>%
+  group_by(participant.code) %>%
+  filter(n() > 1)
+
+testIncentivisedPrediction <-
+  wilcox.test(
+    SelfIsolation ~ Type,
+    data = dataIncentivisedAndBeliefs,
+    paired = T,
+    alternative = "greater"
+  )
+
+
+# FDR p-value adjustment
+p_values_adjusted <- 
+  p.adjust(c(2e-16, 2e-16, 2e-16, 2e-16, .000123, .014, .28), "BH")
+
+```
+
+
+```{r Exploratory analysis}
+
+# We will test whether there is an interaction between assumed self-isolation of 
+# others and the costliness of lockdown on hypothetical self-isolation. 
+
+ExploratoryAnalysis <- 
+  mixed(HypotheticalSelfIsolation ~ 
+         centeredScenario*group.lockdown_cost + 
+         centeredRoundNumber + 
+         (1|participant.code), 
+       data = dataHypothetical,
+       method = "S")
+
+
+ExploratoryEmmeans <-
+  emtrends(
+    ExploratoryAnalysis,
+    var = "centeredScenario",
+    specs = "group.lockdown_cost",
+    lmer.df = "satterthwaite"
+  )
+
+```
+
+```{r Results afex}
+#H1. Players’ incentivised self-isolation level is higher if the number of infections in the group is higher.
+#H2a. Players’ incentivised self-isolation level is lower if their predictions of others’ degree of self-isolation are higher.
+
+summary(lmmIncentivised)
+
+# H2b. Players' hypothetical self-isolation level is lower for higher levels of others' self-isolation.
+
+summary(lmmHypothetical)
+
+# H3. Predictions of others' degree of self-isolation will be influenced by the 
+# number of total infections in the group. That is, players infer that with 
+#more positive cases, the others are self-isolating to a lower degree.
+
+summary(lmmBeliefs)
+
+# H4. Incentivisation decreases self-isolation level. Incentivised self-isolation 
+# level is lower than their hypothetical self-isolation level.
+
+dataSocialDesirability %>% 
+  group_by(Type) %>%
+  summarise(mean = mean(SelfIsolation, na.rm = F),
+            median = median(SelfIsolation),
+            sd = sd(SelfIsolation, na.rm = F))
+qnorm(testSocialDesirability$p.value, lower.tail = F)
+
+
+# H5. Incentivised self-isolation level is higher when the cost of lockdown is higher.
+
+dataLockdownCost %>% 
+  group_by(group.lockdown_cost) %>%
+  summarise(mean = mean(SelfIsolation, na.rm = F),
+            median = median(SelfIsolation),
+            sd = sd(SelfIsolation, na.rm = F))
+qnorm(testLockdownCost$p.value)
+
+# Exploratory Analysis
+
+summary(ExploratoryAnalysis)
+pairs(ExploratoryEmmeans, reverse = T)
+
+testIncentivisedPrediction
+qnorm(testIncentivisedPrediction$p.value, lower.tail = F)
+
+dataIncentivisedAndBeliefs %>%
+  group_by(Type) %>%
+  summarise(mean = mean(SelfIsolation),
+            median = median(SelfIsolation),
+            sd = sd(SelfIsolation))
+
+
+```
