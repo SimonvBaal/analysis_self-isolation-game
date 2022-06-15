@@ -1,12 +1,12 @@
 ---
-title: "Self-isolation game analysis"
+title: "Analysis - Self-Isolation Game"
 author: "Simon van Baal"
 date: "09/12/2021"
 output: html_document
 ---
 
-
 This Rmd file contains the analysis of the Self-Isolation Game.
+
 ```{r libraries, include = FALSE}
 library(tidyverse)
 library(afex)

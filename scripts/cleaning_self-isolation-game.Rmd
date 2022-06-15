@@ -136,7 +136,7 @@ rm(DNF)
 
 ```{r write csv}
 
-write_csv(cleaned_data_game, './cleaned-data/cleaned_data_self-iso-game.csv')
+write_csv(cleaned_data_game, here('cleaned-data/cleaned_data_self-iso-game.csv'))
 rm(raw_data_game, raw_data_survey, cleaned_data_game)
 
 ```

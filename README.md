@@ -2,7 +2,7 @@
 
 This is the repository for the analysis of the Self-Isolation Game.
 
-The analysis is done through first running the 'cleaning_self-isolation-game.Rmd' file, and then the 'analysis_self-isolation-game.Rmd' file.
+The analysis is done through first running the 'cleaning_self-isolation-game.Rmd' file in the scripts subdirectory, and then the 'analysis_self-isolation-game.Rmd' file.
 
 Then, in the tables-and-figures folder, there is a 'tables-and-figures_self-isolation-game.Rmd' file, which can be run to reproduce the figures in the manuscript. Those figures are also contained in the folder.
 

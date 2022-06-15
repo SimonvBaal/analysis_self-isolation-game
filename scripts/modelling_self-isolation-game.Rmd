@@ -1,5 +1,5 @@
 ---
-title: "Self-Isolation Game Simulations"
+title: "Simulations - Self-Isolation Game"
 author: "Simon van Baal"
 date: "09/12/2021"
 output: html_document

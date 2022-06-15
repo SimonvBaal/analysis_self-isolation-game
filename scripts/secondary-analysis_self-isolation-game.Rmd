@@ -6,3 +6,494 @@ output: html_document
 ---
 
 
+```{r libraries}
+# This file can be run directly. 
+# If environment is populated, run: rm(list=ls())
+
+library(here)
+library(tidyverse)
+library(afex)
+library(emmeans)
+
+# table
+library(stargazer)
+
+
+
+#renv::init()
+```
+
+```{r loading data files}
+raw_data_survey <- 
+  read_csv(here('./raw-data/raw-data_survey_self-isolation-game.csv'))
+raw_data_game <- 
+  read_csv(here("./raw-data/raw-data_game_self-isolation-game.csv"))
+
+```
+
+
+```{r Data Cleaning Experiment 1}
+raw_data_survey <- 
+  raw_data_survey %>%
+  select(session.code,
+         participant.code,
+         player.age,
+         player.gender,
+         player.covid_positive,
+         player.location,
+         player.attention_check)
+
+raw_data_game <- 
+  raw_data_game %>%
+  filter(session.is_demo == 0) %>%
+  select(session.code,
+         participant.code,
+         participant.payoff,
+         subsession.round_number,
+         player.id_in_group,
+         player.infected,
+         player.timeout,
+         player.cumulative_earnings,
+         player.others_prediction,
+         player.contribution,
+         player.others_contribution_percentage,
+         player.actual_payment,
+         player.payoff,
+         player.transmission_chance,
+         player.second_player_contribution_0,
+         player.second_player_contribution_1,
+         player.second_player_contribution_2,
+         player.second_player_contribution_3,
+         player.second_player_contribution_4,
+         group.total_contribution,
+         group.total_infections,
+         group.end_total_infections,
+         group.total_earnings,
+         group.lockdown,
+         group.lockdown_number,
+         group.lockdown_cost,
+         group.patient_zero_switch)
+```
+
+```{r Exclusions on basis of participation}
+# Excluding participants who did not finish the experiment, or complete
+# enough of it.
+
+# We exclude on the basis of timeouts; participants who have not completed more 
+# than 70% of trials are regarded as participants who did not finish.
+DNF <- 
+  raw_data_game %>% 
+  group_by(participant.code, session.code) %>% 
+  summarise(nTimeout = sum(player.timeout)) %>% 
+  filter(nTimeout < 12)
+
+# We multiply by ten to indicate the number of points sacrificed.
+cleaned_data_game <-
+  raw_data_game %>%
+  right_join(DNF,
+             by = c("participant.code",
+                    "session.code")) %>%
+  arrange(participant.code, subsession.round_number) %>%
+  mutate(
+    lastRoundOthers =
+      lag(player.others_contribution_percentage),
+    player.contribution = player.contribution * 10,
+    player.others_prediction = player.others_prediction * 10,
+    player.second_player_contribution_0 = player.second_player_contribution_0 *
+      10,
+    player.second_player_contribution_1 = player.second_player_contribution_1 *
+      10,
+    player.second_player_contribution_2 = player.second_player_contribution_2 *
+      10,
+    player.second_player_contribution_3 = player.second_player_contribution_3 *
+      10,
+    player.second_player_contribution_4 = player.second_player_contribution_4 *
+      10
+  )
+
+
+cleaned_data_game <-
+  left_join(cleaned_data_game,
+            raw_data_survey,
+            by = c("session.code", "participant.code")) %>%
+  mutate(Order = factor(
+    ifelse(
+      subsession.round_number <= 20 &
+        group.lockdown_cost == 60 |
+        subsession.round_number > 20 &
+        group.lockdown_cost == 90,
+      "Low Cost First",
+      "High Cost First"
+    )
+  ))
+
+rm(DNF)
+
+```
+
+```{r Attention check, include = FALSE}
+
+# If necessary, it's possible to assess the robustness of results to excluding
+# participants who failed the attention check (uncomment below). 
+# The results appear the same. 
+
+ dataAttentionCheck <-
+   cleaned_data_game %>%
+   filter(player.attention_check == "Chicago")
+
+
+```
+
+
+```{r Datasets for each hypothesis, include = FALSE}
+
+dataIncentivised <-
+  dataAttentionCheck %>%
+  filter(
+    group.lockdown == 0,
+    group.total_infections < 6,
+    player.timeout != 1
+  ) %>%
+  mutate(
+    centeredRoundNumber = scale(subsession.round_number, scale = F),
+    centeredCases = scale(group.total_infections, scale = F),
+    centeredLockdownCost = scale(group.lockdown_cost, scale = F),
+    centeredPrediction = scale(player.others_prediction, scale = F),
+    centeredLastRoundOthers = scale(lastRoundOthers, scale = F)
+  )
+
+dataHypothetical <-
+  dataAttentionCheck %>%
+  filter(group.lockdown == 0) %>%
+  pivot_longer(cols = c("player.second_player_contribution_0",
+                        "player.second_player_contribution_1", 
+                        "player.second_player_contribution_2",
+                        "player.second_player_contribution_3",
+                        "player.second_player_contribution_4"),
+               names_to = "AssumedOthersSelfIsolation",
+               values_to = "HypotheticalSelfIsolation") %>%
+  mutate(AssumedOthersSelfIsolation = 
+           as.numeric(substr(AssumedOthersSelfIsolation, 
+                             start = 35, 
+                             stop = 36))*10,
+         centeredRoundNumber = scale(subsession.round_number, scale = F),
+         centeredCases = scale(group.total_infections, scale = F),
+         centeredLockdownCost = scale(group.lockdown_cost, scale = F),
+         centeredScenario = scale(AssumedOthersSelfIsolation, scale = F),
+         centeredLastRoundOthers = scale(lastRoundOthers, scale = F))
+
+dataSocialDesirability <-
+  dataAttentionCheck %>%
+  filter(
+    group.lockdown == 0
+  ) %>%
+  mutate(
+    PredictedHypothetical =
+      ifelse(
+        player.others_prediction == 0,
+        player.second_player_contribution_0,
+        ifelse(
+          player.others_prediction == 10,
+          player.second_player_contribution_1,
+          ifelse(
+            player.others_prediction == 20,
+            player.second_player_contribution_2,
+            ifelse(
+              player.others_prediction == 30,
+              player.second_player_contribution_3,
+              ifelse(
+                player.others_prediction == 40,
+                player.second_player_contribution_4,
+                NA
+              )
+            )
+          )
+        )
+      )
+  ) %>%
+  group_by(participant.code) %>%
+  summarise(
+    IncentivisedSelfIsolation = mean(player.contribution, na.rm = T),
+    HypotheticalSelfIsolation = mean(PredictedHypothetical, na.rm = T)
+  ) %>%
+  pivot_longer(
+    cols = c("IncentivisedSelfIsolation", "HypotheticalSelfIsolation"),
+    names_to = "Type",
+    values_to = "SelfIsolation"
+  ) %>%
+  filter(!is.nan(SelfIsolation)) %>%
+  group_by(participant.code) %>%
+  filter(n() > 1)
+
+dataLockdownCost <-
+  dataAttentionCheck %>%
+  filter(group.lockdown == 0) %>%
+  group_by(participant.code, group.lockdown_cost) %>%
+  summarise(SelfIsolation = mean(player.contribution, na.rm = T)) %>%
+  filter(!is.nan(SelfIsolation))
+
+```
+
+
+```{r Analysis for p-values and DFs}
+emm_options(pbkrtest.limit = 20000, lmerTest.limit = 20000)
+
+lmmIncentivised <-
+  mixed(player.contribution ~
+          centeredRoundNumber +
+          centeredCases +
+          centeredPrediction +
+          centeredLastRoundOthers +
+          (centeredRoundNumber|participant.code),
+        data = dataIncentivised)
+
+
+lmmHypothetical <-
+  mixed(HypotheticalSelfIsolation ~
+          centeredScenario +
+          centeredLastRoundOthers +
+          centeredCases +
+          centeredRoundNumber +
+          (centeredRoundNumber|participant.code),
+        data = dataHypothetical,
+        method = "S")
+
+
+# Run model to see whether number of cases 
+lmmBeliefs <-
+  mixed(player.others_prediction ~
+          centeredLastRoundOthers +
+          centeredCases +
+          centeredRoundNumber +
+          (centeredRoundNumber|participant.code),
+        data = dataIncentivised)
+
+
+testSocialDesirability <- wilcox.test(
+  SelfIsolation ~ Type,
+  data = dataSocialDesirability,
+  paired = T,
+  alternative = "greater"
+)
+
+
+testLockdownCost <- wilcox.test(
+  SelfIsolation ~ group.lockdown_cost,
+  data = dataLockdownCost,
+  paired = T,
+  alternative = "less"
+)
+
+emm_options(pbkrtest.limit = 20000)
+
+
+
+```
+
+
+```{r Illusory superiority}
+
+# Now we test whether predictions are lower than incentivised self-isolation.
+
+dataIncentivisedAndBeliefs <-
+  dataAttentionCheck %>%
+  filter(
+    group.lockdown == 0,
+    group.total_infections < 6,
+    player.timeout != 1
+  ) %>%
+  group_by(participant.code) %>%
+  summarise(
+    IncentivisedSelfIsolation = mean(player.contribution, na.rm = T),
+    Prediction = mean(player.others_prediction, na.rm = T)
+  ) %>%
+  pivot_longer(
+    cols = c("IncentivisedSelfIsolation", "Prediction"),
+    names_to = "Type",
+    values_to = "SelfIsolation"
+  ) %>%
+  filter(!is.nan(SelfIsolation)) %>%
+  group_by(participant.code) %>%
+  filter(n() > 1)
+
+testIncentivisedPrediction <-
+  wilcox.test(
+    SelfIsolation ~ Type,
+    data = dataIncentivisedAndBeliefs,
+    paired = T,
+    alternative = "greater"
+  )
+
+
+# FDR p-value adjustment
+p_values_adjusted <- 
+  p.adjust(c(2e-16, 2e-16, 2e-16, 2e-16, .000123, .014, .28), "BH")
+
+```
+
+
+```{r Exploratory analysis}
+
+# We test whether there is an interaction between assumed self-isolation of 
+# others and the costliness of lockdown on hypothetical self-isolation. 
+
+ExploratoryAnalysis <- 
+  mixed(HypotheticalSelfIsolation ~ 
+         centeredScenario*group.lockdown_cost + 
+         centeredRoundNumber + 
+         (1|participant.code), 
+       data = dataHypothetical,
+       method = "S")
+
+
+ExploratoryEmmeans <-
+  emtrends(
+    ExploratoryAnalysis,
+    var = "centeredScenario",
+    specs = "group.lockdown_cost",
+    lmer.df = "satterthwaite"
+  )
+
+```
+
+```{r Results afex}
+# We list each hypothesis and then the command to see the test.
+
+#H1. Players’ incentivised self-isolation level is higher if the number of 
+#infections in the group is higher.
+
+#H2a. Players’ incentivised self-isolation level is lower if their predictions 
+#of others’ degree of self-isolation are higher.
+
+summary(lmmIncentivised)
+
+# H2b. Players' hypothetical self-isolation level is lower for higher levels of others' self-isolation.
+
+summary(lmmHypothetical)
+
+# H3. Predictions of others' degree of self-isolation will be influenced by the 
+# number of total infections in the group. That is, players infer that with 
+#more positive cases, the others are self-isolating to a lower degree.
+
+summary(lmmBeliefs)
+
+# H4. Incentivisation decreases self-isolation level. Incentivised self-isolation 
+# level is lower than their hypothetical self-isolation level.
+
+dataSocialDesirability %>% 
+  group_by(Type) %>%
+  summarise(mean = mean(SelfIsolation, na.rm = F),
+            median = median(SelfIsolation),
+            sd = sd(SelfIsolation, na.rm = F))
+qnorm(testSocialDesirability$p.value, lower.tail = F) # z-value
+
+
+# H5. Incentivised self-isolation level is higher when the cost of lockdown is higher.
+
+dataLockdownCost %>% 
+  group_by(group.lockdown_cost) %>%
+  summarise(mean = mean(SelfIsolation, na.rm = F),
+            median = median(SelfIsolation),
+            sd = sd(SelfIsolation, na.rm = F))
+qnorm(testLockdownCost$p.value)
+
+# Exploratory Analysis
+
+# hypothetical self-isolation by scenario under cost of lockdown
+summary(ExploratoryAnalysis)
+pairs(ExploratoryEmmeans, reverse = T)
+
+# illusory superiority
+testIncentivisedPrediction
+qnorm(testIncentivisedPrediction$p.value, lower.tail = F)
+
+dataIncentivisedAndBeliefs %>%
+  group_by(Type) %>%
+  summarise(mean = mean(SelfIsolation),
+            median = median(SelfIsolation),
+            sd = sd(SelfIsolation))
+
+
+```
+
+```{r Secondary analysis table}
+dataIncentivisedStargazer <-
+  dataIncentivised %>%
+  rename(`Incentivised Self-Isolation` = player.contribution,
+         `Round Number` = centeredRoundNumber,
+         `Number of Infections` = centeredCases,
+         `Cost of Lockdown` = centeredLockdownCost,
+         `Beliefs` = centeredPrediction,
+         `Others in Previous Round` = centeredLastRoundOthers,
+         `Participant ID` = participant.code)
+
+
+lmerIncentivised <-
+    lmer(`Incentivised Self-Isolation` ~
+              `Round Number` +
+              `Number of Infections` +
+              `Others in Previous Round` +
+              `Beliefs` +
+              (`Round Number`|`Participant ID`),
+          data = dataIncentivisedStargazer)
+
+class(lmerIncentivised) <- "lmerMod"
+
+dataHypotheticalStargazer <-
+  dataHypothetical %>%
+  rename(`Hypothetical Self-Isolation` = HypotheticalSelfIsolation,
+         `Round Number` = centeredRoundNumber,
+         `Number of Infections` = centeredCases,
+         `Cost of Lockdown` = centeredLockdownCost,
+         `Self-isolation in Scenario` = centeredScenario,
+         `Others in Previous Round` = centeredLastRoundOthers,
+         `Participant ID` = participant.code)
+
+lmerHypothetical <-
+  lmer(`Hypothetical Self-Isolation` ~
+          `Round Number` +
+          `Number of Infections` + 
+          `Others in Previous Round` +
+          `Self-isolation in Scenario` +
+          (`Round Number`|`Participant ID`),
+        data = dataHypotheticalStargazer)
+
+class(lmerHypothetical) <- "lmerMod"
+
+
+lmerBeliefs <-
+  lmer(player.others_prediction ~
+          `Round Number` +
+          `Number of Infections` +
+          `Others in Previous Round` +
+          (`Round Number`|`Participant ID`),
+        data = dataIncentivisedStargazer)
+
+class(lmerBeliefs) <- "lmerMod"
+
+
+
+stargazer(
+  lmerIncentivised,
+  lmerBeliefs,
+  lmerHypothetical,
+  title = "Secondary Analysis - Regression Results H1-H3",
+  out = here("output/tables/regression-table_secondary-analysis_sig.html"),
+  dep.var.labels = c(
+    "Incentivised <br>Self-isolation",
+    "Beliefs About <br>Others",
+    "Hypothetical <br>Self-isolation"
+  ),
+  covariate.labels = c(
+    "Round Number",
+    "Number of Infections",
+    "Others in Previous Round",
+    "Beliefs",
+    "Assumed Self-isolation <br>of Others"
+  ),
+  align = TRUE,
+  no.space = TRUE
+)
+
+```
+
