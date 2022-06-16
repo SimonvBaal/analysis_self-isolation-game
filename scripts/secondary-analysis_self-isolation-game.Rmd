@@ -332,30 +332,6 @@ p_values_adjusted <-
 ```
 
 
-```{r Exploratory analysis}
-
-# We test whether there is an interaction between assumed self-isolation of 
-# others and the costliness of lockdown on hypothetical self-isolation. 
-
-ExploratoryAnalysis <- 
-  mixed(HypotheticalSelfIsolation ~ 
-         centeredScenario*group.lockdown_cost + 
-         centeredRoundNumber + 
-         (1|participant.code), 
-       data = dataHypothetical,
-       method = "S")
-
-
-ExploratoryEmmeans <-
-  emtrends(
-    ExploratoryAnalysis,
-    var = "centeredScenario",
-    specs = "group.lockdown_cost",
-    lmer.df = "satterthwaite"
-  )
-
-```
-
 ```{r Results afex}
 # We list each hypothesis and then the command to see the test.
 
@@ -397,13 +373,7 @@ dataLockdownCost %>%
             sd = sd(SelfIsolation, na.rm = F))
 qnorm(testLockdownCost$p.value)
 
-# Exploratory Analysis
-
-# hypothetical self-isolation by scenario under cost of lockdown
-summary(ExploratoryAnalysis)
-pairs(ExploratoryEmmeans, reverse = T)
-
-# illusory superiority
+# Exploratory Analysis - Illusory superiority
 testIncentivisedPrediction
 qnorm(testIncentivisedPrediction$p.value, lower.tail = F)
 
@@ -494,6 +464,13 @@ stargazer(
   align = TRUE,
   no.space = TRUE
 )
+
+```
+
+```{r Empty environment}
+# Run if you would like to empty the environment to run primary analysis.
+
+#rm(list = ls())
 
 ```
 

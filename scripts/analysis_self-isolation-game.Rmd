@@ -24,6 +24,16 @@ data_game <-
   read_csv(here("cleaned-data/cleaned_data_self-iso-game.csv"))
 ```
 
+```{r descriptive statistics}
+
+data_game %>%
+  group_by(player.gender) %>%
+  summarise(age = mean(player.age),
+            n = n()/40)
+
+```
+
+
 
 ```{r Datasets for each hypothesis, include = FALSE}
 
@@ -39,34 +49,44 @@ dataIncentivised <-
     centeredCases = scale(group.total_infections, scale = F),
     centeredLockdownCost = scale(group.lockdown_cost, scale = F),
     centeredPrediction = scale(player.others_prediction, scale = F),
-    centeredLastRoundOthers = scale(lastRoundOthers, scale = F)
+    centeredLastRoundOthers = scale(lastRoundOthers, scale = F),
+    age = scale(player.age, scale = T), # add demographics for sample information.
+    sex = factor(player.gender) # the variable was mistakenly 'gender', but we collected sex data.
   )
 
 dataHypothetical <-
   data_game %>%
   filter(group.lockdown == 0) %>%
-  pivot_longer(cols = c("player.second_player_contribution_0",
-                        "player.second_player_contribution_1", 
-                        "player.second_player_contribution_2",
-                        "player.second_player_contribution_3",
-                        "player.second_player_contribution_4"),
-               names_to = "AssumedOthersSelfIsolation",
-               values_to = "HypotheticalSelfIsolation") %>%
-  mutate(AssumedOthersSelfIsolation = 
-           as.numeric(substr(AssumedOthersSelfIsolation, 
-                             start = 35, 
-                             stop = 36))*10,
-         centeredRoundNumber = scale(subsession.round_number, scale = F),
-         centeredCases = scale(group.total_infections, scale = F),
-         centeredLockdownCost = scale(group.lockdown_cost, scale = F),
-         centeredScenario = scale(AssumedOthersSelfIsolation, scale = F),
-         centeredLastRoundOthers = scale(lastRoundOthers, scale = F))
+  pivot_longer(
+    cols = c(
+      "player.second_player_contribution_0",
+      "player.second_player_contribution_1",
+      "player.second_player_contribution_2",
+      "player.second_player_contribution_3",
+      "player.second_player_contribution_4"
+    ),
+    names_to = "AssumedOthersSelfIsolation",
+    values_to = "HypotheticalSelfIsolation"
+  ) %>%
+  mutate(
+    AssumedOthersSelfIsolation =
+      as.numeric(substr(
+        AssumedOthersSelfIsolation,
+        start = 35,
+        stop = 36
+      )) * 10,
+    centeredRoundNumber = scale(subsession.round_number, scale = F),
+    centeredCases = scale(group.total_infections, scale = F),
+    centeredLockdownCost = scale(group.lockdown_cost, scale = F),
+    centeredScenario = scale(AssumedOthersSelfIsolation, scale = F),
+    centeredLastRoundOthers = scale(lastRoundOthers, scale = F),
+    age = scale(player.age, scale = T),
+    sex = factor(player.gender)
+  )
 
 dataSocialDesirability <-
   data_game %>%
-  filter(
-    group.lockdown == 0
-  ) %>%
+  filter(group.lockdown == 0) %>%
   mutate(
     PredictedHypothetical =
       ifelse(
@@ -115,7 +135,7 @@ dataLockdownCost <-
 ```
 
 
-```{r Analysis for p-values and DFs}
+```{r Analysis}
 emm_options(pbkrtest.limit = 20000, lmerTest.limit = 20000)
 
 lmmIncentivised <-
@@ -212,31 +232,7 @@ p_values_adjusted <-
 ```
 
 
-```{r Exploratory analysis}
-
-# We will test whether there is an interaction between assumed self-isolation of 
-# others and the costliness of lockdown on hypothetical self-isolation. 
-
-ExploratoryAnalysis <- 
-  mixed(HypotheticalSelfIsolation ~ 
-         centeredScenario*group.lockdown_cost + 
-         centeredRoundNumber + 
-         (1|participant.code), 
-       data = dataHypothetical,
-       method = "S")
-
-
-ExploratoryEmmeans <-
-  emtrends(
-    ExploratoryAnalysis,
-    var = "centeredScenario",
-    specs = "group.lockdown_cost",
-    lmer.df = "satterthwaite"
-  )
-
-```
-
-```{r Results afex}
+```{r Hypothesis testing}
 #H1. Players’ incentivised self-isolation level is higher if the number of infections in the group is higher.
 #H2a. Players’ incentivised self-isolation level is lower if their predictions of others’ degree of self-isolation are higher.
 
@@ -272,11 +268,7 @@ dataLockdownCost %>%
             sd = sd(SelfIsolation, na.rm = F))
 qnorm(testLockdownCost$p.value)
 
-# Exploratory Analysis
-
-summary(ExploratoryAnalysis)
-pairs(ExploratoryEmmeans, reverse = T)
-
+# Exploratory Analysis - Illusory superiority
 testIncentivisedPrediction
 qnorm(testIncentivisedPrediction$p.value, lower.tail = F)
 
@@ -286,5 +278,31 @@ dataIncentivisedAndBeliefs %>%
             median = median(SelfIsolation),
             sd = sd(SelfIsolation))
 
+
+```
+
+
+
+```{r Influence of demographic variables}
+# Descriptives about the influence of sex on mean response patterns.
+
+dataIncentivised %>%
+  group_by(sex) %>%
+  summarise(meanSelfIsolation = mean(player.contribution, na.rm = T))
+
+dataIncentivised %>%
+  group_by(player.contribution) %>%
+  summarise(meanAge = mean(age))
+
+lmmDemogIncentivised <-
+  mixed(player.contribution ~
+          age +
+          sex +
+          centeredRoundNumber +
+          centeredCases +
+          centeredPrediction +
+          centeredLastRoundOthers +
+          (centeredRoundNumber|participant.code),
+        data = dataIncentivised)
 
 ```

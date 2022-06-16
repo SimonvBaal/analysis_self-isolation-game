@@ -119,19 +119,6 @@ rm(DNF)
 
 ```
 
-```{r Attention check, include = FALSE}
-
-# If necessary, it's possible to assess the robustness of results to excluding
-# participants who failed the attention check (uncomment below). 
-# The results appear the same. 
-
-# dataAttentionCheck <-
-#   cleaned_data_game %>%
-#   filter(player.attention_check == "Chicago")
-
-
-```
-
 
 
 ```{r write csv}
